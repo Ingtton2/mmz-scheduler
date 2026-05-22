@@ -138,28 +138,26 @@ input:focus,select:focus{border-color:var(--br5)}
 <div class="app" id="app"></div>
 
 <script>
-// ─── [중요] 구글 Firebase 설정 영역 ──────────────────────────────────────────
-// 사장님의 Firebase 프로젝트에서 발급받은 설정값을 복사해서 여기에 넣으시면 실시간 연동이 시작됩니다!
+// ─── 구글 Firebase 설정 영역 ──────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "적으셔도_되고_빈칸이어도_기본기능은_작동합니다",
-  authDomain: "memealzip-schedule.firebaseapp.com",
-  databaseURL: "https://memealzip-schedule-default-rtdb.firebaseio.com/", // 여기에 실시간 DB 주소가 들어갑니다.
-  projectId: "memealzip-schedule",
-  storageBucket: "memealzip-schedule.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:12345:web:12345"
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
 };
 
-// Firebase 초기화 (설정값이 정상적이지 않으면 로컬 단독 모드로 작동)
 let database = null;
 try {
-  if (firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("적으셔도")) {
+  if (firebaseConfig.databaseURL && firebaseConfig.databaseURL.trim() !== "") {
     firebase.initializeApp(firebaseConfig);
     database = firebase.database();
   }
 } catch (e) { console.error("Firebase 로드 실패, 로컬 모드로 전환합니다.", e); }
 
-// ─── 데이터 정의 (포지션 및 업무능력등급 반영) ─────────────────────────────────
+// ─── 데이터 정의 ─────────────────────────────────
 const SHIFTS={
   'O':'O (10:30~20:30)','M':'M (11:00~21:00)','C':'C (11:30~21:30)',
   'HO':'홀오픈 (10:45~20:45)','HC':'홀마감 (11:30~21:30)',
@@ -168,7 +166,6 @@ const SHIFTS={
 const SHIFT_CSS={O:'shift-O',M:'shift-M',C:'shift-C',HO:'shift-HO',HC:'shift-HC',FM:'shift-FM','&&':'shift-PP',DO:'shift-DO',YC:'shift-YC',KH:'shift-KH',TH:'shift-TH'};
 const DAYS_KR=['일','월','화','수','목','금','토'];
 
-// 초기 직원 리스트 (포지션 position: hall/kitchen, 등급 level: A/B/C)
 const defaultEmployees=[
   {id:1,name:'신주민',role:'manager',position:'hall',level:'A',prefShifts:['HC','HO','C'],fixedOff:[],workDays:5,weekend:false,boss:false,annualLeaveTotal:15},
   {id:2,name:'권현석',role:'staff',position:'kitchen',level:'B',prefShifts:['C','O'],fixedOff:[3],workDays:5,weekend:false,boss:false,annualLeaveTotal:15},
@@ -195,7 +192,6 @@ let state={
   passwordHash:null, isLocked:false, _unlocked:false,
 };
 
-// ─── 서버 실시간 데이터 동기화 함수 ───────────────────────────────────────────
 function pushStateToServer(){
   if(!database) { saveStateToLocal(); return; }
   database.ref('memealzip_schedule_data').set({
@@ -230,399 +226,4 @@ function loadStateFromLocal(){
   try{
     const s=localStorage.getItem('memealzip_v1'); if(!s) return;
     const p=JSON.parse(s);
-    if(p.schedule) state.schedule=p.schedule;
-    if(p.employees) state.employees=p.employees;
-    if(p.annualLeave) state.annualLeave=p.annualLeave;
-    if(p.passwordHash) state.passwordHash=p.passwordHash;
-    if(p.isLocked!=null) state.isLocked=p.isLocked;
-    validateSchedule();
-  }catch(e){}
-}
-
-// ─── 날짜 계산 유틸 ──────────────────────────────────────────────────────────
-function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate()}
-function getFirstDay(y,m){return new Date(y,m,1).getDay()}
-function getDayOfWeek(y,m,d){return new Date(y,m,d).getDay()}
-function isToday(d){return TODAY.getFullYear()===state.year&&TODAY.getMonth()===state.month&&TODAY.getDate()===d}
-function getLeaves(id,y,m){return state.annualLeave[`${id}_${y}_${m}`]||[]}
-function hasLeave(id,y,m,d){return getLeaves(id,y,m).includes(d)}
-function simpleHash(str){
-  let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h)+str.charCodeAt(i)|0;
-  return(h>>>0).toString(36);
-}
-function isEditAllowed(){ return !state.passwordHash||!state.isLocked||state._unlocked; }
-function getShiftClass(s){return SHIFT_CSS[s]||'shift-DO'}
-function shiftLabel(s){
-  if(!s)return '-';
-  return{O:'O',M:'M',C:'C',HO:'홀오픈',HC:'홀마감',FM:'풀오마','&&':'&&',DO:'D/O',YC:'연차',KH:'경휴',TH:'훈련'}[s]||s;
-}
-
-function getLeaveStats(emp){
-  const year=TODAY.getFullYear();
-  const total=emp.annualLeaveTotal||0;
-  const usedPrior=state.annualLeaveUsedPrior[emp.id]||0;
-  let usedTracked=0; for(let m=0;m<12;m++) usedTracked+=getLeaves(emp.id,year,m).length;
-  return {total, usedPrior, usedTracked, usedAll:usedPrior+usedTracked, remaining:total-(usedPrior+usedTracked)};
-}
-
-// ─── [핵심 알고리즘] 포지션 분리 및 업무능력 등급 밸런싱 자동 스케줄링 ───────────
-function generateSchedule(){
-  const {year:y,month:m,employees:emps}=state;
-  const days=getDaysInMonth(y,m);
-  const sched={};
-  for(let d=1;d<125;d++) sched[d]={}; // 스케줄 일자별 틀 초기화
-  for(let d=1;d<=days;d++) sched[d]={};
-
-  const bosses=emps.filter(e=>e.boss);
-  const nonBosses=emps.filter(e=>!e.boss);
-
-  // 1. 사장 출근 일수 균등 배정 (평일만 각자 최대 11일씩 균등하게 배치)
-  const weekdayPool=[];
-  for(let d=1;d<=days;d++){ if(getDayOfWeek(y,m,d)>=1 && getDayOfWeek(y,m,d)<=5) weekdayPool.push(d); }
-  const target=Math.min(11, Math.floor(weekdayPool.length/2));
-  const shuffledDays=[...weekdayPool].sort(()=>Math.random()-.5);
-  
-  let b0d=new Set(), b1d=new Set();
-  for(let i=0; i<shuffledDays.length; i++){
-    if(b0d.size < target) b0d.add(shuffledDays[i]);
-    else if(b1d.size < target) b1d.add(shuffledDays[i]);
-  }
-
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d);
-    if(dw===0||dw===6){ sched[d][bosses[0].id]='DO'; sched[d][bosses[1].id]='DO'; }
-    else {
-      sched[d][bosses[0].id]=b0d.has(d)?'&&':'DO';
-      sched[d][bosses[1].id]=b1d.has(d)?'&&':'DO';
-    }
-  }
-
-  // 주간 근무 카운트 트래킹용 구조체
-  const jwCount={};
-  function weekOf(d){return Math.floor((d+getFirstDay(y,m)-1)/7)}
-  nonBosses.forEach(e=>{ jwCount[e.id]={}; for(let w=0;w<6;w++) jwCount[e.id][w]=0; });
-
-  // 2. 주말 파트타임 별도 선배정
-  const weekendEmps = nonBosses.filter(e=>e.weekend);
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d);
-    if(dw===0||dw===6){
-      weekendEmps.forEach(emp=>{
-        if(!hasLeave(emp.id,y,m,d)){
-          sched[d][emp.id]=emp.prefShifts[0]||'FM';
-          jwCount[emp.id][weekOf(d)]++;
-        } else { sched[d][emp.id]='YC'; }
-      });
-    }
-  }
-
-  // 3. 일자별 홀/주방 포지션 및 등급 점수 매칭 배치
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d), isWe=dw===0||dw===6;
-    
-    // 포지션별 타겟팅 인원 설정: 하루 총출근 6명 기준 (홀3 / 주방3 밸런스 배치)
-    // 사장이 출근한 경우 해당 사장의 포지션을 가감함
-    let bHall = bosses.filter(b=>sched[d][b.id]==='&&' && b.position==='hall').length;
-    let bKitchen = bosses.filter(b=>sched[d][b.id]==='&&' && b.position==='kitchen').length;
-
-    let targetHall = Math.max(1, 3 - bHall);
-    let targetKitchen = Math.max(1, 3 - bKitchen);
-
-    // 각 포지션별 가용 풀 구성
-    const getPool = (pos) => nonBosses.filter(emp => {
-      if(emp.weekend && !isWe) return false;
-      if(emp.weekend && isWe) return false; // 이미 주말직원은 위에서 처리 완료
-      if(emp.position !== pos) return false;
-      if(hasLeave(emp.id,y,m,d)) { sched[d][emp.id]='YC'; return false; }
-      if((emp.fixedOff||[]).includes(dw)) return false;
-      if(jwCount[emp.id][weekOf(d)] >= emp.workDays) return false;
-      return true;
-    });
-
-    // 랭크 정렬 함수: 주간 근무를 적게 한 순서 + 능력 등급 높은 순서 가중치 밸런싱
-    const sortFullPool = (pool) => pool.sort((a,b)=>{
-      let scoreA = jwCount[a.id][weekOf(d)] * 10 - (a.level==='A'?3:a.level=='B'?1:0);
-      let scoreB = jwCount[b.id][weekOf(d)] * 10 - (b.level==='A'?3:b.level=='B'?1:0);
-      return scoreA - scoreB + (Math.random()-.5)*2;
-    });
-
-    // 홀 인원 추출 및 배치
-    let hallPool = sortFullPool(getPool('hall'));
-    let pickedHall = hallPool.slice(0, targetHall);
-    pickedHall.forEach(emp=>{
-      sched[d][emp.id] = emp.prefShifts[Math.floor(Math.random()*emp.prefShifts.length)]||'O';
-      jwCount[emp.id][weekOf(d)]++;
-    });
-
-    // 주방 인원 추출 및 배치
-    let kitchenPool = sortFullPool(getPool('kitchen'));
-    let pickedKitchen = kitchenPool.slice(0, targetKitchen);
-    pickedKitchen.forEach(emp=>{
-      sched[d][emp.id] = emp.prefShifts[Math.floor(Math.random()*emp.prefShifts.length)]||'O';
-      jwCount[emp.id][weekOf(d)]++;
-    });
-
-    // 배정 안 된 직원은 휴무(DO) 처리
-    nonBosses.forEach(emp=>{
-      if(!sched[d][emp.id] && !emp.weekend) sched[d][emp.id]='DO';
-      if(emp.weekend && !isWe) sched[d][emp.id]='DO';
-    });
-  }
-
-  state.schedule=sched;
-  validateSchedule();
-  pushStateToServer();
-  render();
-}
-
-// ─── 정밀 검증 룰 세팅 (홀/주방 구성비 및 A등급 포함 여부 체크) ─────────────────────
-function validateSchedule(){
-  const {year:y,month:m,employees:emps,schedule:sched}=state;
-  const days=getDaysInMonth(y,m);
-  const warns=[];
-
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d), isWe=dw===0||dw===6, ds=sched[d]||{};
-    const workingEmps = emps.filter(e=>ds[e.id]&&ds[e.id]!=='DO'&&ds[e.id]!=='YC'&&ds[e.id]!=='KH'&&ds[e.id]!=='TH');
-    
-    // Rule 1: 하루 총 근무자 6명 확인
-    if(workingEmps.length!==6 && Object.keys(ds).length>0){
-      warns.push(`${m+1}/${d}: 총 출근 인원 오류 (${workingEmps.length}명 근무중, 6명이어야 함)`);
-    }
-
-    // Rule 2: 홀/주방 포지션 밸런스 체크
-    const hCount = workingEmps.filter(e=>e.position==='hall').length;
-    const kCount = workingEmps.filter(e=>e.position==='kitchen').length;
-    if((hCount < 2 || kCount < 2) && workingEmps.length>0){
-      warns.push(`${m+1}/${d}: 포지션 불균형 (홀 ${hCount}명 / 주방 ${kCount}명)`);
-    }
-
-    // Rule 3: 최소 1명 이상의 A등급 숙련자 배치 검증
-    const hHasA = workingEmps.some(e=>e.position==='hall' && e.level==='A');
-    const kHasA = workingEmps.some(e=>e.position==='kitchen' && e.level==='A');
-    if((!hHasA || !kHasA) && workingEmps.length>0){
-      warns.push(`${m+1}/${d}: 숙련도 경고 (${!hHasA?'[홀]':''} ${!kHasA?'[주방]':''}에 A등급 숙련자가 없습니다)`);
-    }
-  }
-  state.warnings=warns;
-}
-
-// ─── 뷰 컨트롤러 렌더링 ──────────────────────────────────────────────────────
-function render(){
-  const app=document.getElementById('app'); app.innerHTML='';
-  const hasSchedule=Object.keys(state.schedule).length>0;
-
-  // Header 렌더
-  const hdr=document.createElement('div'); hdr.className='app-header';
-  hdr.innerHTML=`<div class="header-text">
-    <div class="header-title">메밀집 실시간 스케줄러 🌐</div>
-    <div class="header-sub">실시간 클라우드 동기화 시스템 (2026년 버젼)</div>
-  </div>`;
-  app.appendChild(hdr);
-
-  // 상단 탭 렌더
-  const tabsEl=document.createElement('div'); tabsEl.className='tabs';
-  ['스케줄표','직원·포지션','연차 관리','근무 통계'].forEach((t,i)=>{
-    const btn=document.createElement('button'); btn.className='tab'+(state.tab===i?' active':'');
-    btn.textContent=t; btn.onclick=()=>{state.tab=i; render();}; tabsEl.appendChild(btn);
-  });
-  app.appendChild(tabsEl);
-
-  const content=document.createElement('div'); content.className='content'; app.appendChild(content);
-
-  if(state.tab===0) renderScheduleTab(content, hasSchedule);
-  else if(state.tab===1) renderEmployeeTab(content);
-  else if(state.tab===2) renderLeaveTab(content);
-  else renderStatsTab(content);
-
-  if(state.modal) renderModal(app);
-}
-
-function renderScheduleTab(el, hasSchedule){
-  const {year:y,month:m}=state;
-  const days=getDaysInMonth(y,m);
-
-  const ctrl=document.createElement('div'); ctrl.className='flex ai-c jc-sb flex-wrap gap-8'; ctrl.style.marginBottom='10px';
-  const nav=document.createElement('div'); nav.className='month-nav';
-  
-  const prev=document.createElement('button'); prev.textContent='‹'; prev.onclick=()=>{state.month--; if(state.month<0){state.month=11; state.year--;} validateSchedule(); render();};
-  const cur=document.createElement('span'); cur.textContent=`${y}년 ${m+1}월`;
-  const nxt=document.createElement('button'); nxt.textContent='›'; nxt.onclick=()=>{state.month++; if(state.month>11){state.month=0; state.year++;} validateSchedule(); render();};
-  nav.append(prev,cur,nxt);
-
-  const rctrl=document.createElement('div'); rctrl.className='flex gap-8 ai-c';
-  const vt=document.createElement('div'); vt.className='view-toggle';
-  ['표','달력'].forEach((lbl,i)=>{
-    const b=document.createElement('button'); b.textContent=lbl; b.className=(state.view===(i===0?'table':'calendar'))?'active':'';
-    b.onclick=()=>{state.view=i===0?'table':'calendar'; render();}; vt.appendChild(b);
-  });
-
-  const genBtn=document.createElement('button'); genBtn.className='btn btn-primary'; genBtn.textContent='✦ 자동 스케줄링';
-  genBtn.onclick=()=>{
-    if(!isEditAllowed()){ state.modal={type:'verifyPassword'}; render(); return; }
-    if(hasSchedule && !confirm('주의: 기존 수동 수정 데이터를 포함해 이번 달 스케줄이 재편성됩니다. 진행할까요?')) return;
-    generateSchedule();
-  };
-  rctrl.append(vt, genBtn); ctrl.append(nav, rctrl); el.appendChild(ctrl);
-
-  // 규칙 경고 알림판
-  if(state.warnings.length>0){
-    const wb=document.createElement('div'); wb.className='warn-box';
-    wb.innerHTML=`<strong>⚠ 조건 미달 사항 ${state.warnings.length}건 확인됨</strong><ul>${state.warnings.slice(0,3).map(w=>`<li>${w}</li>`).join('')}</ul>`;
-    el.appendChild(wb);
-  }
-
-  if(!hasSchedule){
-    el.innerHTML+=`<div style="text-align:center;padding:50px;color:#999;">작성된 스케줄이 없습니다. 상단의 자동 스케줄링을 돌려주세요.</div>`;
-  } else {
-    if(state.view==='table') renderTableView(el,y,m,days);
-    else renderCalendarView(el,y,m,days);
-  }
-}
-
-function renderTableView(el,y,m,days){
-  const wrap=document.createElement('div'); wrap.className='tbl-wrap';
-  const tbl=document.createElement('table'); tbl.className='sched-table';
-  
-  let hHtml='<tr><th class="col-name">직원 (포지션/급)</th>';
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d);
-    hHtml+=`<th class="${dw===0?'sunday':dw===6?'saturday':''}">${d}<br><small>${DAYS_KR[dw]}</small></th>`;
-  }
-  hHtml+='</tr>';
-  tbl.innerHTML=hHtml;
-
-  // 홀 파트 출력 구역
-  const renderGroup = (title, empsList) => {
-    if(empsList.length===0) return;
-    const sep=document.createElement('tr'); sep.className='row-sep';
-    sep.innerHTML=`<td colspan="${days+1}" style="background:#F0EBE0; font-weight:700; text-align:left; padding:4px 8px; color:var(--br7)">🔹 ${title}</td>`;
-    tbl.appendChild(sep);
-
-    empsList.forEach(emp=>{
-      const tr=document.createElement('tr'); if(emp.boss) tr.className='row-boss';
-      let rHtml=`<td class="col-name"><strong>${emp.name}</strong> <small style="font-size:10px; color:#777;">(${emp.position==='hall'?'홀':'주방'}/${emp.level})</small></td>`;
-      for(let d=1;d<=days;d++){
-        const s=state.schedule[d]?.[emp.id]||'DO';
-        rHtml+=`<td><button class="cell-btn ${getShiftClass(s)}" onclick="editCell(${d}, ${emp.id})">${shiftLabel(s)}</button></td>`;
-      }
-      tr.innerHTML=rHtml; tbl.appendChild(tr);
-    });
-  };
-
-  renderGroup("홀 팀 (Hall Team)", state.employees.filter(e=>e.position==='hall'));
-  renderGroup("주방 팀 (Kitchen Team)", state.employees.filter(e=>e.position==='kitchen'));
-
-  wrap.appendChild(tbl); el.appendChild(wrap);
-}
-
-function renderCalendarView(el,y,m,days){
-  const grid=document.createElement('div'); grid.className='calendar-grid';
-  DAYS_KR.forEach(d=>{ const h=document.createElement('div'); h.className='cal-day-head'; h.textContent=d; grid.appendChild(h); });
-  
-  const start=getFirstDay(y,m);
-  for(let i=0;i<start;i++) { const em=document.createElement('div'); em.className='cal-day empty'; grid.appendChild(em); }
-  
-  for(let d=1;d<=days;d++){
-    const dw=getDayOfWeek(y,m,d);
-    const box=document.createElement('div'); box.className=`cal-day ${dw===0?'sunday':dw===6?'saturday':''}`;
-    box.innerHTML=`<div class="cal-date">${d}</div>`;
-    
-    state.employees.forEach(emp=>{
-      const s=state.schedule[d]?.[emp.id];
-      if(s && s!=='DO'){
-        const en=document.createElement('div'); en.className='cal-entry';
-        en.innerHTML=`<span class="cal-name">${emp.name} <small style="color:#999">(${emp.position==='hall'?'홀':'주방'})</small></span><span class="badge ${getShiftClass(s)}">${shiftLabel(s)}</span>`;
-        box.appendChild(en);
-      }
-    });
-    grid.appendChild(box);
-  }
-  el.appendChild(grid);
-}
-
-function renderEmployeeTab(el){
-  el.innerHTML=`<h3 class="section-title">소속 직원 명부 및 등급 관리</h3>`;
-  state.employees.forEach(emp=>{
-    const c=document.createElement('div'); c.className='card flex jc-sb ai-c';
-    c.innerHTML=`<div>
-      <strong style="font-size:15px">${emp.name}</strong> <span class="badge ${emp.position==='hall'?'pos-hall':'pos-kitchen'}">${emp.position==='hall'?'홀 파트':'주방 파트'}</span>
-      <span class="badge lvl-${emp.level}">업무능력: ${emp.level}등급</span>
-      <div style="font-size:11px; margin-top:4px; color:var(--txt2);">주간 타겟 근무일수: ${emp.workDays}일 | 역할: ${emp.role}</div>
-    </div>`;
-    el.appendChild(c);
-  });
-}
-
-function renderLeaveTab(el){
-  el.innerHTML=`<h3 class="section-title">2026년 잔여 연차 실시간 현황</h3>`;
-  state.employees.filter(e=>!e.boss).forEach(emp=>{
-    const stats=getLeaveStats(emp);
-    const c=document.createElement('div'); c.className='card';
-    c.innerHTML=`<div style="font-size:14px; font-weight:700; margin-bottom:6px;">${emp.name} <small>(${emp.position==='hall'?'홀':'주방'})</small></div>
-    <span class="badge shift-O">총 생성분: ${stats.total}개</span>
-    <span class="badge shift-DO">이전 소모분: ${stats.usedPrior}개</span>
-    <span class="badge shift-YC">당월 소모분: ${stats.usedTracked}개</span>
-    <span class="badge shift-HO" style="background:#D1FAE5; color:#065F46;">최종 잔여분: ${stats.remaining}개</span>`;
-    el.appendChild(c);
-  });
-}
-
-function renderStatsTab(el){
-  el.innerHTML=`<h3 class="section-title">월간 총 근무 현황 통계</h3>`;
-  let h=`<table class="stat-table"><tr><th>이름</th><th>포지션</th><th>총 배정일수</th><th>연차 사용</th></tr>`;
-  state.employees.forEach(emp=>{
-    let wd=0, yc=0;
-    Object.values(state.schedule).forEach(day=>{
-      if(day[emp.id]==='YC') yc++; else if(day[emp.id] && day[emp.id]!=='DO') wd++;
-    });
-    h+=`<tr><td><strong>${emp.name}</strong></td><td>${emp.position==='hall'?'홀':'주방'}</td><td>${wd}일</td><td>${yc}회</td></tr>`;
-  });
-  h+=`</table>`; el.innerHTML+=h;
-}
-
-function editCell(d, empId){
-  if(!isEditAllowed()){ state.modal={type:'verifyPassword'}; return; }
-  state.modal={type:'edit', d, empId}; render();
-}
-
-function renderModal(app){
-  const overlay=document.createElement('div'); overlay.className='modal-overlay';
-  const m=document.createElement('div'); m.className='modal';
-
-  if(state.modal.type==='edit'){
-    const {d, empId}=state.modal; const emp=state.employees.find(e=>e.id===empId);
-    m.innerHTML=`<div class="modal-title">근무 시프트 수동 강제 변경</div>
-    <div style="font-size:13px; margin-bottom:10px;">직원명: <strong>${emp.name}</strong> (${d}일 근무 변경)</div>`;
-    const sel=document.createElement('select'); sel.className='w100'; sel.style.marginBottom='15px';
-    Object.entries(SHIFTS).forEach(([k,v])=>{
-      const op=document.createElement('option'); op.value=k; op.textContent=v;
-      if(state.schedule[d]?.[empId]===k) op.selected=true; sel.appendChild(op);
-    });
-    m.appendChild(sel);
-    
-    const bDiv=document.createElement('div'); bDiv.className='flex gap-8';
-    const cBtn=document.createElement('button'); cBtn.className='btn flex-1'; cBtn.textContent='닫기'; cBtn.onclick=()=>{state.modal=null; render();};
-    const sBtn=document.createElement('button'); sBtn.className='btn btn-primary flex-1'; sBtn.textContent='반영하기';
-    sBtn.onclick=()=>{
-      if(!state.schedule[d]) state.schedule[d]={}; state.schedule[d][empId]=sel.value;
-      validateSchedule(); pushStateToServer(); state.modal=null; render();
-    };
-    bDiv.append(cBtn, sBtn); m.appendChild(bDiv);
-  } else if(state.modal.type==='verifyPassword'){
-    m.innerHTML=`<div class="modal-title">보안 잠금 해제</div>
-    <p style="font-size:12px; color:#666; margin-bottom:8px;">관리자 전용 편집 모드로 전환하기 위해 비밀번호를 채워주세요.</p>
-    <input type="password" id="modalPw" class="w100" style="margin-bottom:12px;" placeholder="초기 비밀번호: 1234">
-    <div class="flex gap-8">
-      <button class="btn flex-1" onclick="state.modal=null; render();">취소</button>
-      <button class="btn btn-primary flex-1" onclick="const input=document.getElementById('modalPw').value; if(input==='1234'||simpleHash(input)===state.passwordHash){ state._unlocked=true; state.modal=null; alert('인증되었습니다. 이제 수정 및 자동 생성이 가능합니다.'); render(); } else { alert('암호 오류'); }">확인</button>
-    </div>`;
-  }
-  overlay.appendChild(m); app.appendChild(overlay);
-}
-
-// 초기 구동 청취기 작동
-listenServerChanges();
-</script>
-</body>
-</html>
+    if(p.schedule
