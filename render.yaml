@@ -1,0 +1,36 @@
+# Render Blueprint — 이 파일 하나로 "백엔드 웹서비스 + PostgreSQL" 을 한 번에 만듭니다.
+# Render 대시보드 → New → Blueprint → 이 GitHub 저장소 선택 → Apply.
+# 자세한 순서는 docs/DEPLOY.md 참고.
+
+databases:
+  - name: mmz-scheduler-db
+    databaseName: mmz_scheduler
+    plan: free            # 무료 (주의: 90일 뒤 만료 → 새로 만들어야 함)
+
+services:
+  - type: web
+    name: mmz-scheduler-api
+    runtime: python
+    plan: free            # 무료 (15분 idle 후 잠들어서 첫 요청이 느림)
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mmz-scheduler-db
+          property: connectionString
+      # 아래 둘은 프론트엔드(Vercel) 주소를 알게 된 뒤에 Render 대시보드에서 채웁니다.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      # (선택) 관리자 화면 보호. 둘 다 채우면 로그인창이 뜹니다.
+      - key: ADMIN_USER
+        sync: false
+      - key: ADMIN_PASS
+        sync: false

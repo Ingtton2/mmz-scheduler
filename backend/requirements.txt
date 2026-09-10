@@ -1,0 +1,22 @@
+# 백엔드가 사용하는 파이썬 라이브러리 목록.
+# 설치:  pip install -r requirements.txt
+
+# --- 웹 서버 ---
+fastapi>=0.115
+uvicorn[standard]>=0.32       # FastAPI 앱 실행기
+python-multipart>=0.0.9       # 파일 업로드/폼 처리
+
+# --- 데이터베이스 ---
+sqlmodel>=0.0.22              # 파이썬 코드로 DB 테이블 다루기
+pydantic-settings>=2.5        # .env 설정값 읽기
+psycopg[binary]>=3.2         # PostgreSQL 드라이버 (배포 환경). 로컬 SQLite 는 필요 없지만 설치돼도 무해
+
+# --- 자동배치 엔진 (스펙 권장) ---
+ortools>=9.11                 # Google OR-Tools, 제약 최적화 솔버(CP-SAT)
+
+# --- QR 코드 ---
+qrcode[pil]>=7.4              # 공유 URL -> QR 이미지
+
+# --- 개발/테스트용 ---
+pytest>=8.3
+httpx>=0.27                   # 테스트에서 서버에 가짜 요청 보내기
