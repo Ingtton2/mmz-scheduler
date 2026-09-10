@@ -4,6 +4,14 @@
 
 - 원본 스펙: [`restaurant_schedule_app_spec.md`](restaurant_schedule_app_spec.md)
 - 기술 스택 설명 (쉬운 버전): [`docs/architecture.md`](docs/architecture.md)
+- **인터넷 배포 가이드 (처음 하는 사람용)**: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+
+## 로컬 실행 vs 배포
+
+| | 데이터베이스 | 실행 |
+|---|---|---|
+| 로컬 개발 | SQLite (`backend/app.db`, 자동 생성) | 아래 "실행 방법" |
+| 배포 | PostgreSQL (`DATABASE_URL` 환경변수) | Render(백엔드+DB) + Vercel(프론트) — `docs/DEPLOY.md` |
 
 ## 진행 상황
 
