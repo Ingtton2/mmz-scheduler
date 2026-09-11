@@ -78,6 +78,9 @@ export default function StaffPage() {
   const [editLeave, setEditLeave] = useState<LeaveForm>({ ...EMPTY_LEAVE });
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
+  // 기존 직원 클릭 -> 등록 폼에 정보 채워서 수정 모드로 전환 (삭제 후 재등록 금지).
+  const [editingStaffId, setEditingStaffId] = useState<number | null>(null);
+
   const isOwner = form.role === "owner";
   // 연차·기본휴무는 정직원 + 점장(정직원)만
   const showLeave =
@@ -115,15 +118,30 @@ export default function StaffPage() {
       return setError("근무 가능 요일을 하나 이상 선택해 주세요.");
     setSaving(true);
     try {
-      await createStaff({
-        name: form.name.trim(),
-        role: form.role,
-        position: form.position,
-        employment_type: isOwner ? null : form.employment_type,
-        work_weekdays: form.work_weekdays,
-        fixed_schedule: form.fixed_schedule,
-        leave: toInput(form.leave),
-      });
+      if (editingStaffId != null) {
+        await updateStaff(editingStaffId, {
+          name: form.name.trim(),
+          role: form.role,
+          position: form.position,
+          employment_type: isOwner ? null : form.employment_type,
+          work_weekdays: form.work_weekdays,
+          fixed_schedule: form.fixed_schedule,
+        });
+        if (showLeave) {
+          await updateLeaveBalance(editingStaffId, toInput(form.leave));
+        }
+        setEditingStaffId(null);
+      } else {
+        await createStaff({
+          name: form.name.trim(),
+          role: form.role,
+          position: form.position,
+          employment_type: isOwner ? null : form.employment_type,
+          work_weekdays: form.work_weekdays,
+          fixed_schedule: form.fixed_schedule,
+          leave: toInput(form.leave),
+        });
+      }
       setForm({ ...EMPTY_FORM, work_weekdays: [0, 1, 2, 3, 4, 5, 6], leave: { ...EMPTY_LEAVE } });
       setError("");
       await refresh();
@@ -132,6 +150,35 @@ export default function StaffPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function startEditStaff(s: Staff) {
+    setEditingId(null); // 인라인 연차 수정 중이었다면 닫기
+    setEditingStaffId(s.id);
+    setError("");
+    setForm({
+      name: s.name,
+      role: s.role,
+      position: s.position,
+      employment_type: s.employment_type ?? "full_time",
+      work_weekdays: s.work_weekdays,
+      fixed_schedule: s.fixed_schedule,
+      leave: s.leave
+        ? {
+            base_off_days: String(s.leave.base_off_days),
+            prev_remaining: String(s.leave.prev_remaining),
+            prev_accrued: String(s.leave.prev_accrued),
+            used: String(s.leave.used),
+          }
+        : { ...EMPTY_LEAVE },
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEditStaff() {
+    setEditingStaffId(null);
+    setForm({ ...EMPTY_FORM, work_weekdays: [0, 1, 2, 3, 4, 5, 6], leave: { ...EMPTY_LEAVE } });
+    setError("");
   }
 
   async function handleDelete(id: number) {
@@ -189,8 +236,19 @@ export default function StaffPage() {
 
       <h1 className="mb-4 text-xl font-bold">직원 등록/관리</h1>
 
-      {/* --- 등록 폼 --- */}
-      <form onSubmit={handleSubmit} className="mb-6 rounded-lg border bg-white p-4">
+      {/* --- 등록/수정 폼 --- */}
+      <form
+        onSubmit={handleSubmit}
+        className={
+          "mb-6 rounded-lg border bg-white p-4" +
+          (editingStaffId != null ? " ring-2 ring-amber-400" : "")
+        }
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-semibold text-gray-700">
+            {editingStaffId != null ? "직원 정보 수정" : "새 직원 등록"}
+          </span>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">이름</span>
@@ -350,13 +408,25 @@ export default function StaffPage() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {saving ? "저장 중…" : "직원 추가"}
-        </button>
+        <div className="mt-4 flex gap-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saving ? "저장 중…" : editingStaffId != null ? "수정 저장" : "직원 추가"}
+          </button>
+          {editingStaffId != null && (
+            <button
+              type="button"
+              onClick={cancelEditStaff}
+              disabled={saving}
+              className="rounded border px-4 py-2 text-sm disabled:opacity-50"
+            >
+              취소
+            </button>
+          )}
+        </div>
       </form>
 
       {error && (
@@ -411,6 +481,8 @@ export default function StaffPage() {
                   onAskDelete={() => setPendingDelete(s.id)}
                   onCancelDelete={() => setPendingDelete(null)}
                   onConfirmDelete={() => handleDelete(s.id)}
+                  editingInfo={editingStaffId === s.id}
+                  onStartEditInfo={() => startEditStaff(s)}
                 />
               ))
             )}
@@ -441,6 +513,8 @@ function FragmentRow({
   onAskDelete,
   onCancelDelete,
   onConfirmDelete,
+  editingInfo,
+  onStartEditInfo,
 }: {
   s: Staff;
   editing: boolean;
@@ -454,12 +528,23 @@ function FragmentRow({
   onAskDelete: () => void;
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
+  editingInfo: boolean;
+  onStartEditInfo: () => void;
 }) {
   const restricted = s.work_weekdays.length < 7;
   return (
     <>
-      <tr className="border-b last:border-0">
-        <td className="px-3 py-2 font-medium">{s.name}</td>
+      <tr className={"border-b last:border-0" + (editingInfo ? " bg-amber-50" : "")}>
+        <td className="px-3 py-2 font-medium">
+          <button
+            type="button"
+            onClick={onStartEditInfo}
+            className="hover:underline"
+            title="눌러서 이 직원 정보 수정"
+          >
+            {s.name}
+          </button>
+        </td>
         <td className="px-3 py-2">{LABEL.role[s.role] ?? s.role}</td>
         <td className="px-3 py-2">{LABEL.position[s.position] ?? s.position}</td>
         <td className="px-3 py-2">
@@ -515,10 +600,16 @@ function FragmentRow({
               </>
             ) : (
               <>
+                <button
+                  onClick={onStartEditInfo}
+                  className="text-xs text-gray-600 hover:underline"
+                >
+                  정보 수정
+                </button>
                 {s.leave && (
                   <button
                     onClick={onStartEdit}
-                    className="text-xs text-gray-600 hover:underline"
+                    className="ml-2 text-xs text-gray-600 hover:underline"
                   >
                     연차 수정
                   </button>

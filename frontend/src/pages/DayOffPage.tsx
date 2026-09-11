@@ -12,6 +12,8 @@ import {
 } from "../api/dayoff";
 import { listStaff, type Staff } from "../api/staff";
 import { fmtRange } from "./LeavePage";
+import MonthFilterBar from "../components/MonthFilterBar";
+import { rangeOverlapsMonth, todayYm } from "../utils/month";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 const ym = (d: string) => d.slice(0, 7); // "2026-10"
@@ -35,6 +37,7 @@ export default function DayOffPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
+  const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
 
   const [form, setForm] = useState({
     staff_id: "",
@@ -42,6 +45,14 @@ export default function DayOffPage() {
     end_date: todayStr(),
     note: "",
   });
+
+  const selectedStaff = staff.find((s) => s.id === Number(form.staff_id));
+  const isPartTime = selectedStaff?.employment_type === "part_time";
+
+  const visibleRequests =
+    monthFilter === null
+      ? requests
+      : requests.filter((r) => rangeOverlapsMonth(r.start_date, r.end_date, monthFilter));
 
   function setStart(v: string) {
     setForm((f) => ({
@@ -84,6 +95,10 @@ export default function DayOffPage() {
     e.preventDefault();
     if (!form.staff_id) {
       setError("직원을 선택해 주세요.");
+      return;
+    }
+    if (isPartTime) {
+      setError("파트타임은 사전 휴무 신청 대상이 아닙니다.");
       return;
     }
     setSaving(true);
@@ -166,55 +181,63 @@ export default function DayOffPage() {
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">시작일</span>
-          <input
-            type="date"
-            className={field}
-            value={form.start_date}
-            onChange={(e) => setStart(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">종료일</span>
-          <input
-            type="date"
-            className={field}
-            min={form.start_date}
-            value={form.end_date}
-            onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-          />
-        </label>
+        {isPartTime ? (
+          <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            파트타임은 사전 휴무 신청 대상이 아닙니다.
+          </p>
+        ) : (
+          <>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">시작일</span>
+              <input
+                type="date"
+                className={field}
+                value={form.start_date}
+                onChange={(e) => setStart(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">종료일</span>
+              <input
+                type="date"
+                className={field}
+                min={form.start_date}
+                value={form.end_date}
+                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+              />
+            </label>
 
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="font-medium">메모 (선택)</span>
-          <input
-            className={field}
-            value={form.note}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-            placeholder="예: 가족 행사, 개인 사정"
-          />
-        </label>
+            <label className="flex flex-1 flex-col gap-1 text-sm">
+              <span className="font-medium">메모 (선택)</span>
+              <input
+                className={field}
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="예: 가족 행사, 개인 사정"
+              />
+            </label>
 
-        <button
-          type="submit"
-          disabled={saving || !hasStaff}
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {saving ? "저장 중…" : "사전 휴무 추가"}
-        </button>
+            <button
+              type="submit"
+              disabled={saving || !hasStaff}
+              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {saving ? "저장 중…" : "사전 휴무 추가"}
+            </button>
 
-        {form.staff_id && (
-          <span
-            className={
-              "text-xs " +
-              (usedThisMonth >= MAX_PER_MONTH
-                ? "text-red-600"
-                : "text-gray-400")
-            }
-          >
-            {targetYm} 신청 {usedThisMonth}/{MAX_PER_MONTH}일
-          </span>
+            {form.staff_id && (
+              <span
+                className={
+                  "text-xs " +
+                  (usedThisMonth >= MAX_PER_MONTH
+                    ? "text-red-600"
+                    : "text-gray-400")
+                }
+              >
+                {targetYm} 신청 {usedThisMonth}/{MAX_PER_MONTH}일
+              </span>
+            )}
+          </>
         )}
       </form>
 
@@ -224,6 +247,12 @@ export default function DayOffPage() {
         </p>
       )}
 
+      <MonthFilterBar
+        month={monthFilter}
+        onChange={setMonthFilter}
+        total={requests.length}
+        shown={visibleRequests.length}
+      />
       <div className="overflow-x-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-500">
@@ -241,14 +270,16 @@ export default function DayOffPage() {
                   불러오는 중…
                 </td>
               </tr>
-            ) : requests.length === 0 ? (
+            ) : visibleRequests.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
-                  아직 등록된 사전 휴무 신청이 없습니다.
+                  {requests.length === 0
+                    ? "아직 등록된 사전 휴무 신청이 없습니다."
+                    : "이 달에는 신청 내역이 없습니다."}
                 </td>
               </tr>
             ) : (
-              requests.map((r) => (
+              visibleRequests.map((r) => (
                 <tr key={r.id} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium whitespace-nowrap">
                     {fmtRange(r.start_date, r.end_date, r.days)}
