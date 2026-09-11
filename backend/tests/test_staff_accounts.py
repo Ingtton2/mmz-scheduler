@@ -94,6 +94,31 @@ def test_owner_signup_auto_approved(client: TestClient):
     assert ok.status_code == 200
 
 
+def test_owner_hidden_from_public_signup_list(client: TestClient):
+    """사장님은 공개 가입 화면(/join)에 안 보여야 한다 — 관리자 화면에서 따로 계정을 만든다."""
+    oid = _make_staff(client, "숨겨질사장님", role="owner", position="both")
+    sid = _make_staff(client, "보일직원")
+
+    avail = client.get("/api/public/staff-accounts/available").json()
+    ids = [a["id"] for a in avail]
+    assert oid not in ids
+    assert sid in ids
+
+    # 관리자 화면에는 "계정 없는 사장님" 목록으로 뜬다.
+    owners = client.get("/api/staff-accounts/owners-without-account").json()
+    assert oid in [o["id"] for o in owners]
+
+    # 관리자 화면에서 사장님 계정을 만들면 -> 즉시 승인, 그리고 그 목록에서 빠짐
+    res = client.post(
+        "/api/public/staff-accounts/signup", json={"staff_id": oid, "pin": "4321"}
+    )
+    assert res.status_code == 201
+    assert res.json()["status"] == "approved"
+
+    owners_after = client.get("/api/staff-accounts/owners-without-account").json()
+    assert oid not in [o["id"] for o in owners_after]
+
+
 def test_reject_removes_and_allows_resignup(client: TestClient):
     sid = _make_staff(client, "거절될사람")
     client.post("/api/public/staff-accounts/signup", json={"staff_id": sid, "pin": "1234"})

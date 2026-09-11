@@ -1,7 +1,7 @@
 """
 직원 셀프서비스 가입/로그인 (스펙 9) — 로그인 없이 접근 (QR/링크로 /join, /staff-login).
 
-  GET  /api/public/staff-accounts/available    가입 신청 화면 드롭다운 (계정 없는 직원)
+  GET  /api/public/staff-accounts/available    가입 신청 화면 드롭다운 (계정 없는 직원, 사장님 제외)
   POST /api/public/staff-accounts/signup       가입 신청 (기존 직원 선택 + PIN)
   GET  /api/public/staff-accounts/login-list   로그인 화면 드롭다운 (승인된 직원)
   POST /api/public/staff-accounts/login        로그인 (이름 선택 + PIN) -> 토큰 발급
@@ -43,7 +43,9 @@ def available(session: Session = Depends(get_session)) -> list[AvailableStaffOut
     return [
         AvailableStaffOut(id=s.id, name=s.name, position=s.position, role=s.role)
         for s in staff_rows
-        if s.id not in linked_ids
+        # 사장님은 이 공개 목록에 안 보이게 한다 (직원 화면에서 사장님 이름 노출 방지).
+        # 사장님 본인 계정은 관리자 화면(/admin/accounts)에서 따로 만든다.
+        if s.id not in linked_ids and s.role != "owner"
     ]
 
 

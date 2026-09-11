@@ -2,10 +2,13 @@
 관리자용: 직원 셀프서비스 계정 승인/거절/PIN 초기화 (스펙 9-2, 9-3).
 경로가 /api/public/... 이 아니라서 관리자 로그인이 켜져 있으면 자동으로 보호된다.
 
-  GET  /api/staff-accounts               계정 전체 목록 (대기중 + 승인됨)
-  GET  /api/staff-accounts/pending        승인 대기 목록만
-  POST /api/staff-accounts/{id}/approve   승인
-  POST /api/staff-accounts/{id}/reject    거절 (행 삭제 -> 재신청 가능)
+  GET  /api/staff-accounts                     계정 전체 목록 (대기중 + 승인됨)
+  GET  /api/staff-accounts/pending              승인 대기 목록만
+  GET  /api/staff-accounts/owners-without-account  아직 계정 없는 사장님 목록
+                                                    (사장님은 공개 가입 목록엔 안 보이므로
+                                                     여기서 관리자가 대신 계정을 만들어준다)
+  POST /api/staff-accounts/{id}/approve         승인
+  POST /api/staff-accounts/{id}/reject          거절 (행 삭제 -> 재신청 가능)
   POST /api/staff-accounts/reset-pin/{staff_id}  PIN 초기화 (임시 PIN 발급)
 """
 
@@ -15,7 +18,12 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import DEFAULT_STORE_ID, Staff, StaffAccount
 from app.models.base import utcnow
-from app.schemas.staff_account import AccountOut, PendingAccountOut, ResetPinResult
+from app.schemas.staff_account import (
+    AccountOut,
+    AvailableStaffOut,
+    PendingAccountOut,
+    ResetPinResult,
+)
 from app.services import pin as pin_service
 
 router = APIRouter(prefix="/staff-accounts", tags=["staff-accounts"])
@@ -68,6 +76,27 @@ def list_pending(session: Session = Depends(get_session)) -> list[PendingAccount
             created_at=acc.created_at,
         )
         for acc, staff in rows
+    ]
+
+
+@router.get("/owners-without-account", response_model=list[AvailableStaffOut])
+def owners_without_account(session: Session = Depends(get_session)) -> list[AvailableStaffOut]:
+    linked_ids = set(
+        session.exec(
+            select(StaffAccount.staff_id).where(StaffAccount.store_id == DEFAULT_STORE_ID)
+        ).all()
+    )
+    owners = session.exec(
+        select(Staff).where(
+            Staff.store_id == DEFAULT_STORE_ID,
+            Staff.role == "owner",
+            Staff.is_active == True,  # noqa: E712
+        )
+    ).all()
+    return [
+        AvailableStaffOut(id=s.id, name=s.name, position=s.position, role=s.role)
+        for s in owners
+        if s.id not in linked_ids
     ]
 
 

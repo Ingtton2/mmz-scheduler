@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listAvailableForSignup, signup, type AvailableStaff } from "../api/me";
 import { MeApiError } from "../api/meClient";
-import { LABEL } from "../labels";
 
 export default function JoinPage() {
   const [staff, setStaff] = useState<AvailableStaff[]>([]);
@@ -74,7 +73,7 @@ export default function JoinPage() {
             </option>
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({LABEL.role[s.role] ?? s.role} · {LABEL.position[s.position] ?? s.position})
+                {s.name}
               </option>
             ))}
           </select>
