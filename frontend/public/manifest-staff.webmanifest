@@ -1,0 +1,16 @@
+{
+  "name": "메밀집 내 스케줄",
+  "short_name": "내 스케줄",
+  "description": "메밀집 직원용 — 내 스케줄 조회, 연차·사전휴무 신청",
+  "start_url": "/staff-login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FDFBF7",
+  "theme_color": "#9C6B23",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icons/staff-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/staff-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

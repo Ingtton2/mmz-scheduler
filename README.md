@@ -5,6 +5,7 @@
 - 원본 스펙: [`restaurant_schedule_app_spec.md`](restaurant_schedule_app_spec.md)
 - 기술 스택 설명 (쉬운 버전): [`docs/architecture.md`](docs/architecture.md)
 - **인터넷 배포 가이드 (처음 하는 사람용)**: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+- **홈 화면에 앱 추가하기 (PWA)**: [`docs/PWA_INSTALL.md`](docs/PWA_INSTALL.md)
 
 ## 로컬 실행 vs 배포
 
@@ -40,6 +41,7 @@
 - [x] **8단계 — QR 공유 + 직원 조회** (공유 버튼 → 고유 URL·QR PNG, `/schedule/{code}` 에서 로그인 없이 근무표 조회)
 - [x] **보안 — 관리자 로그인** (`/admin` 전체가 토큰 기반 로그인으로 보호, `ADMIN_USER`/`ADMIN_PASS` 설정 시에만 켜짐)
 - [x] **9단계 — 직원 셀프서비스 계정** (`/join` 가입 신청 → 사장님 승인(`/admin/accounts`) → `/staff-login` 이름+PIN 로그인 → `/me` 이하에서 본인 연차/사전휴무 신청(다음 달분만, 20일 마감) + 본인 스케줄 조회. 사장님 계정은 즉시 승인, PIN 분실 시 관리자가 초기화)
+- [x] **10단계 — PWA (홈 화면 앱 설치)** — 사장님용(`/admin`, 골드 테두리 아이콘)·직원용(`/staff-login`, 기본 로고 아이콘) 별도 설치 가능. 자세한 방법: [`docs/PWA_INSTALL.md`](docs/PWA_INSTALL.md)
 
 ### 표준 테스트 직원으로 초기화
 

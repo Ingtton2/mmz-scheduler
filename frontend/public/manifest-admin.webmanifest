@@ -1,0 +1,16 @@
+{
+  "name": "메밀집 스케줄 관리",
+  "short_name": "메밀집 관리자",
+  "description": "메밀집 사장님용 근태관리 앱 — 직원 등록, 자동배치, QR 공유",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FDFBF7",
+  "theme_color": "#9C6B23",
+  "lang": "ko",
+  "icons": [
+    { "src": "/icons/admin-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/admin-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

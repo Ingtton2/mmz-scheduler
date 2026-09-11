@@ -30,6 +30,7 @@ import RequireStaffAuth from "./RequireStaffAuth";
 import { getAuthStatus, logout as apiLogout } from "./api/auth";
 import logo from "./assets/logo.png";
 import { clearToken, getToken } from "./api/client";
+import { syncPwaIdentity } from "./pwa";
 
 function LogoutButton() {
   const [enabled, setEnabled] = useState(false);
@@ -71,6 +72,11 @@ const NO_ADMIN_CHROME_PREFIXES = ["/schedule/", "/join", "/staff-login", "/me"];
 export default function App() {
   const location = useLocation();
   const isAdminChrome = !NO_ADMIN_CHROME_PREFIXES.some((p) => location.pathname.startsWith(p));
+
+  // 화면(관리자용/직원용/공개)이 바뀔 때마다 PWA 매니페스트·홈화면 아이콘을 맞춰 단다.
+  useEffect(() => {
+    syncPwaIdentity(location.pathname);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-cream text-ink">
