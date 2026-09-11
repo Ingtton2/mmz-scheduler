@@ -16,9 +16,12 @@ from app.api import (
     routes_auth,
     routes_dayoff,
     routes_leave,
+    routes_me,
     routes_public,
+    routes_public_accounts,
     routes_schedule,
     routes_staff,
+    routes_staff_accounts,
     routes_staffing,
 )
 
@@ -30,3 +33,6 @@ api_router.include_router(routes_dayoff.router)
 api_router.include_router(routes_staffing.router)
 api_router.include_router(routes_schedule.router)
 api_router.include_router(routes_public.router)
+api_router.include_router(routes_public_accounts.router)
+api_router.include_router(routes_staff_accounts.router)
+api_router.include_router(routes_me.router)

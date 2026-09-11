@@ -32,6 +32,7 @@ from app.models import (
 from app.models.base import date_range, utcnow
 from app.scheduler.engine import SolveInput, StaffInput, build_schedule
 from app.schemas.staff import has_leave_balance
+from app.services.schedule_summary import summarize as _summarize
 from app.schemas.schedule import (
     VALID_CODES,
     AutoScheduleRequest,
@@ -42,40 +43,6 @@ from app.schemas.schedule import (
     ShareResult,
     ShiftSummary,
 )
-
-# 코드 -> (슬롯 키, 포지션 키 or None)
-_CODE_TO_KEY: dict[str, tuple[str, str | None]] = {
-    "FO": ("open", "hall"),
-    "FC": ("close", "hall"),
-    "BO": ("open", "kitchen"),
-    "BM": ("mid", "kitchen"),
-    "BC": ("close", "kitchen"),
-    "풀오마": ("full", None),
-    "D/O": ("off", None),
-    "연차": ("leave", None),
-    "사휴": ("blocked", None),
-    # 구버전 저장분 호환
-    "O": ("open", None),
-    "M": ("mid", None),
-    "C": ("close", None),
-}
-
-
-def _summarize(cells: dict[str, str]) -> ShiftSummary:
-    acc = {
-        k: 0
-        for k in ("open", "mid", "close", "full", "hall", "kitchen", "off", "leave", "blocked")
-    }
-    for code in cells.values():
-        info = _CODE_TO_KEY.get(code)
-        if not info:
-            continue
-        acc[info[0]] += 1
-        if info[1]:
-            acc[info[1]] += 1
-    return ShiftSummary(
-        work=acc["open"] + acc["mid"] + acc["close"] + acc["full"], **acc
-    )
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 

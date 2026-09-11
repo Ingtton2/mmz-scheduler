@@ -16,9 +16,12 @@ from app.config import settings
 from app.database import engine, init_db
 from app.services.auth_tokens import verify_token
 
-# 관리자 로그인에서 제외할 경로
-# (직원 QR 조회 / 헬스체크 / 로그인 자체는 로그인 없이 열려 있어야 함).
-_OPEN_PREFIXES = ("/health", "/api/public", "/api/auth")
+# 관리자 로그인(admin_auth 미들웨어)에서 제외할 경로.
+#  - /api/public   : 직원 QR 조회 + 직원 가입/로그인 (스펙 9) — 관리자 토큰 없이 열려 있어야 함
+#  - /api/auth     : 관리자 로그인 자체
+#  - /api/me       : 직원 셀프서비스 — 관리자 토큰이 아니라 "직원 토큰"이 필요하므로
+#                    여기서는 그냥 통과시키고, routes_me.py 의 get_current_staff 가 개별적으로 검증한다.
+_OPEN_PREFIXES = ("/health", "/api/public", "/api/auth", "/api/me")
 
 
 @asynccontextmanager

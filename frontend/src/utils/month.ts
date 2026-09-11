@@ -23,3 +23,18 @@ export function rangeOverlapsMonth(start: string, end: string, ym: string): bool
   const monthEnd = `${ym}-${String(lastDay).padStart(2, "0")}`;
   return start <= monthEnd && end >= monthStart;
 }
+
+// --- 직원 셀프서비스 신청 가능 기간 (스펙 9-5) ------------------------------
+// 백엔드 app/services/request_window.py 와 같은 규칙: 이번 달 20일까지,
+// "다음 달" 스케줄에 대해서만 신청 가능. 여기 값은 화면 안내용이고,
+// 실제 허용 여부는 서버가 다시 검사한다.
+export const SELF_SERVICE_CUTOFF_DAY = 20;
+
+export function selfServiceWindowOpen(today: Date = new Date()): boolean {
+  return today.getDate() <= SELF_SERVICE_CUTOFF_DAY;
+}
+
+// "다음 달"을 ym 문자열로.
+export function selfServiceTargetYm(today: Date = new Date()): string {
+  return shiftYm(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`, 1);
+}

@@ -18,16 +18,13 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import DEFAULT_STORE_ID, LeaveRequest, Staff
 from app.schemas.leave import LeaveRequestCreate, LeaveRequestRead, LeaveRequestUpdate
+from app.services.date_overlap import overlaps as _overlaps
 
 router = APIRouter(prefix="/leave-requests", tags=["leave-requests"])
 
 
 def _days(start: date, end: date) -> int:
     return (end - start).days + 1
-
-
-def _overlaps(a1: date, a2: date, b1: date, b2: date) -> bool:
-    return a1 <= b2 and b1 <= a2
 
 
 def _to_read(req: LeaveRequest, staff_name: str) -> LeaveRequestRead:

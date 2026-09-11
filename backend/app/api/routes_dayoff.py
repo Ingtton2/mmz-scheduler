@@ -16,18 +16,14 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import MAX_PER_MONTH, DEFAULT_STORE_ID, DayOffRequest, Staff
-from app.models.base import date_range
 from app.schemas.dayoff import DayOffRequestCreate, DayOffRequestRead
+from app.services.date_overlap import days_by_month, overlaps as _overlaps
 
 router = APIRouter(prefix="/dayoff-requests", tags=["dayoff-requests"])
 
 
 def _days(start: date, end: date) -> int:
     return (end - start).days + 1
-
-
-def _overlaps(a1: date, a2: date, b1: date, b2: date) -> bool:
-    return a1 <= b2 and b1 <= a2
 
 
 def _to_read(req: DayOffRequest, staff_name: str) -> DayOffRequestRead:
@@ -76,14 +72,12 @@ def create_request(
         raise HTTPException(status_code=409, detail="이미 신청한 기간과 겹칩니다.")
 
     # 월별 한도: 새 기간이 걸친 각 달마다 (기존 + 새) 일수가 한도 이하여야 함
-    new_by_month: dict[tuple[int, int], int] = {}
-    for d in date_range(payload.start_date, payload.end_date):
-        new_by_month[(d.year, d.month)] = new_by_month.get((d.year, d.month), 0) + 1
+    new_by_month = days_by_month(payload.start_date, payload.end_date)
 
     exist_by_month: dict[tuple[int, int], int] = {}
     for r in existing:
-        for d in date_range(r.start_date, r.end_date):
-            exist_by_month[(d.year, d.month)] = exist_by_month.get((d.year, d.month), 0) + 1
+        for ym, cnt in days_by_month(r.start_date, r.end_date).items():
+            exist_by_month[ym] = exist_by_month.get(ym, 0) + cnt
 
     for ym, cnt in new_by_month.items():
         if exist_by_month.get(ym, 0) + cnt > MAX_PER_MONTH:

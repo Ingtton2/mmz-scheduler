@@ -15,9 +15,18 @@ import LeavePage from "./pages/LeavePage";
 import DayOffPage from "./pages/DayOffPage";
 import StaffingPage from "./pages/StaffingPage";
 import SchedulePage from "./pages/SchedulePage";
+import StaffAccountsPage from "./pages/StaffAccountsPage";
 import PublicSchedule from "./pages/PublicSchedule";
 import LoginPage from "./pages/LoginPage";
+import JoinPage from "./pages/JoinPage";
+import StaffLoginPage from "./pages/StaffLoginPage";
+import MyHome from "./pages/me/MyHome";
+import MyPinChangePage from "./pages/me/MyPinChangePage";
+import MyLeavePage from "./pages/me/MyLeavePage";
+import MyDayOffPage from "./pages/me/MyDayOffPage";
+import MySchedulePage from "./pages/me/MySchedulePage";
 import RequireAuth from "./RequireAuth";
+import RequireStaffAuth from "./RequireStaffAuth";
 import { getAuthStatus, logout as apiLogout } from "./api/auth";
 import { clearToken, getToken } from "./api/client";
 
@@ -55,10 +64,12 @@ function LogoutButton() {
   );
 }
 
+// 이 화면들은 각자 자기만의 헤더(또는 무헤더)를 쓰므로, 관리자 공통 헤더를 숨긴다.
+const NO_ADMIN_CHROME_PREFIXES = ["/schedule/", "/join", "/staff-login", "/me"];
+
 export default function App() {
   const location = useLocation();
-  // 직원 조회 화면(QR)·로그인 화면은 관리자 헤더(로그아웃 버튼 등) 없이 깔끔하게 보여준다.
-  const isAdminChrome = !location.pathname.startsWith("/schedule/");
+  const isAdminChrome = !NO_ADMIN_CHROME_PREFIXES.some((p) => location.pathname.startsWith(p));
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -73,7 +84,7 @@ export default function App() {
 
       <main className="mx-auto max-w-6xl p-4">
         <Routes>
-          {/* 관리자 로그인 (스펙 9 간이 버전) */}
+          {/* 관리자 로그인 (스펙 1단계) */}
           <Route path="/login" element={<LoginPage />} />
 
           {/* 사장님용 (관리자) — 스펙 6.1. 로그인 설정이 켜져 있으면 로그인 필요. */}
@@ -125,9 +136,61 @@ export default function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/admin/accounts"
+            element={
+              <RequireAuth>
+                <StaffAccountsPage />
+              </RequireAuth>
+            }
+          />
 
           {/* 직원 조회 전용 — QR 로 접속. 로그인 없음 — 스펙 6.2 */}
           <Route path="/schedule/:shareCode" element={<PublicSchedule />} />
+
+          {/* 직원 셀프서비스 — 스펙 9 */}
+          <Route path="/join" element={<JoinPage />} />
+          <Route path="/staff-login" element={<StaffLoginPage />} />
+          <Route
+            path="/me"
+            element={
+              <RequireStaffAuth>
+                <MyHome />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/change-pin"
+            element={
+              <RequireStaffAuth>
+                <MyPinChangePage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/leave"
+            element={
+              <RequireStaffAuth>
+                <MyLeavePage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/dayoff"
+            element={
+              <RequireStaffAuth>
+                <MyDayOffPage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/schedule"
+            element={
+              <RequireStaffAuth>
+                <MySchedulePage />
+              </RequireStaffAuth>
+            }
+          />
 
           {/* 그 외 주소는 관리자 홈으로 */}
           <Route path="*" element={<Navigate to="/admin" replace />} />

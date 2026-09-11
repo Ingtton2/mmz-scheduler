@@ -28,6 +28,7 @@ from app.models.dayoff import MAX_PER_MONTH, DayOffRequest
 from app.models.leave import LeaveBalance, LeaveRequest
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
+from app.models.staff_account import StaffAccount
 from app.models.staffing import StaffingRequirement
 from app.models.store import DEFAULT_STORE_ID, Store
 from app.models.work_code import WorkCode
@@ -45,6 +46,7 @@ __all__ = [
     "ScheduleEntry",
     "ScheduleStatus",
     "Staff",
+    "StaffAccount",
     "StaffRole",
     "StaffingRequirement",
     "Store",
