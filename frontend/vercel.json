@@ -5,6 +5,7 @@
       "source": "/api/:path*",
       "destination": "https://mmz-scheduler-api.onrender.com/api/:path*"
     },
+    { "source": "/staff-login", "destination": "/staff-login.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

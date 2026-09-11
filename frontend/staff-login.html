@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>memeal.zip — 근태관리 (직원용)</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <!-- 전체 폰트: Pretendard -->
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
+    />
+
+    <!--
+      카카오톡 등 메신저에 /staff-login 링크를 공유했을 때 뜨는 미리보기.
+      index.html 과 다른 제목/설명을 보여주기 위한 별도 진입점 — vercel.json 이
+      "/staff-login" 요청만 이 파일로 돌려준다 (그 외 주소는 그대로 index.html).
+      로드되는 스크립트는 index.html 과 똑같은 React 앱이라, 뜨고 나면
+      React Router 가 현재 주소(/staff-login)를 읽어 알아서 직원 로그인
+      화면을 그린다.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="메밀집 스케쥴관리(직원용)" />
+    <meta
+      property="og:description"
+      content="직원들이 본인 스케줄을 확인하고, 연차신청을 통해 휴무 관리를 할 수 있는 페이지입니다."
+    />
+    <meta property="og:image" content="https://mmz-scheduler.vercel.app/logo.png" />
+    <meta property="og:url" content="https://mmz-scheduler.vercel.app/staff-login" />
+  </head>
+  <body>
+    <!-- React 화면이 이 div 안에 그려집니다. -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
