@@ -12,9 +12,15 @@ type Status = "checking" | "ok" | "login";
 export default function RequireAuth({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [status, setStatus] = useState<Status>("checking");
+  const [slow, setSlow] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    // Render 무료 서버는 15분 넘게 안 쓰면 잠들어서, 첫 요청이 30초~1분 걸릴 수 있다.
+    // 확인이 오래 걸리면 "멈춘 게 아니라 서버가 깨는 중"이라고 안내한다.
+    const slowTimer = setTimeout(() => {
+      if (!cancelled) setSlow(true);
+    }, 4000);
 
     async function check() {
       try {
@@ -36,9 +42,11 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
     }
 
     setStatus("checking");
+    setSlow(false);
     check();
     return () => {
       cancelled = true;
+      clearTimeout(slowTimer);
     };
   }, [location.pathname]);
 
@@ -52,7 +60,16 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
   }, []);
 
   if (status === "checking") {
-    return <div className="p-8 text-sm text-gray-400">확인 중...</div>;
+    return (
+      <div className="p-8 text-sm text-gray-400">
+        확인 중...
+        {slow && (
+          <p className="mt-2 text-gray-400">
+            서버가 잠들어 있다가 깨는 중일 수 있어요 (최대 1분 정도 걸릴 수 있습니다).
+          </p>
+        )}
+      </div>
+    );
   }
   if (status === "login") {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;

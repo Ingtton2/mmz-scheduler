@@ -40,6 +40,26 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Render 무료 서버가 잠들어 있으면 첫 요청이 30초~1분 걸릴 수 있다 (docs/DEPLOY.md 참고).
+// 그보다 훨씬 오래 걸리면(네트워크 문제 등) 화면이 영원히 "확인 중"으로 멈추지 않도록
+// 넉넉한 타임아웃을 둔다.
+const REQUEST_TIMEOUT_MS = 55_000;
+
+async function timedFetch(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError("서버 응답이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.", 0);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -77,7 +97,7 @@ async function parse<T>(res: Response, label: string): Promise<T> {
 
 export async function apiGet<T>(path: string): Promise<T> {
   return parse<T>(
-    await fetch(`${BASE}${path}`, { headers: authHeaders() }),
+    await timedFetch(`${BASE}${path}`, { headers: authHeaders() }),
     `GET ${path}`,
   );
 }
@@ -87,7 +107,7 @@ export async function apiSend<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await timedFetch(`${BASE}${path}`, {
     method,
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: body === undefined ? undefined : JSON.stringify(body),
