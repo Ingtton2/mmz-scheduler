@@ -94,7 +94,7 @@ export default function MySchedulePage() {
                     {d.slice(5)} ({WD_CHAR[wd]})
                   </span>
                   {code ? (
-                    <span className={"rounded px-2 py-0.5 text-xs font-medium " + (meta?.cls ?? "")}>
+                    <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (meta?.cls ?? "")}>
                       {meta?.short ?? code}
                     </span>
                   ) : (

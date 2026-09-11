@@ -132,7 +132,7 @@ export default function MyLeavePage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {saving ? "신청 중…" : "연차 신청"}
           </button>

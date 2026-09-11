@@ -209,7 +209,7 @@ export default function LeavePage() {
             <button
               type="submit"
               disabled={saving || !hasStaff}
-              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {saving ? "저장 중…" : "연차 신청 추가"}
             </button>
@@ -267,10 +267,10 @@ export default function LeavePage() {
                     <button
                       onClick={() => toggleStatus(r)}
                       className={
-                        "rounded px-2 py-0.5 text-xs " +
+                        "rounded-full px-2 py-0.5 text-xs font-semibold " +
                         (r.status === "confirmed"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-600")
+                          ? "bg-mint text-mint-ink"
+                          : "bg-amber-100 text-amber-800")
                       }
                       title="눌러서 상태 전환"
                     >

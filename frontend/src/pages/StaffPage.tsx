@@ -331,7 +331,7 @@ export default function StaffPage() {
                   className={
                     "h-8 w-8 rounded text-sm " +
                     (on
-                      ? "bg-gray-900 text-white"
+                      ? "bg-primary hover:bg-primary-dark text-white"
                       : "border border-gray-300 text-gray-500")
                   }
                 >
@@ -412,7 +412,7 @@ export default function StaffPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {saving ? "저장 중…" : editingStaffId != null ? "수정 저장" : "직원 추가"}
           </button>
@@ -660,7 +660,7 @@ function FragmentRow({
               <div className="flex gap-2">
                 <button
                   onClick={onSaveEdit}
-                  className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+                  className="rounded bg-primary hover:bg-primary-dark px-3 py-1.5 text-xs font-medium text-white"
                 >
                   저장
                 </button>

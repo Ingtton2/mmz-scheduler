@@ -62,7 +62,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded bg-gray-900 py-2 text-white disabled:opacity-50"
+          className="w-full rounded bg-primary hover:bg-primary-dark py-2 text-white disabled:opacity-50"
         >
           {loading ? "로그인 중..." : "로그인"}
         </button>

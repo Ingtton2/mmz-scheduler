@@ -218,7 +218,7 @@ export default function StaffingPage() {
       <button
         onClick={save}
         disabled={saving || loading}
-        className="mt-4 rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="mt-4 rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
         {saving ? "저장 중…" : "저장"}
       </button>

@@ -95,7 +95,7 @@ export default function MyPinChangePage() {
             <button
               type="submit"
               disabled={saving}
-              className="w-full rounded bg-gray-900 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="w-full rounded bg-primary hover:bg-primary-dark py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {saving ? "변경 중…" : "PIN 변경"}
             </button>

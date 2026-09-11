@@ -73,7 +73,7 @@ export default function App() {
   const isAdminChrome = !NO_ADMIN_CHROME_PREFIXES.some((p) => location.pathname.startsWith(p));
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
+    <div className="min-h-screen bg-cream text-ink">
       {isAdminChrome && (
         <header className="flex items-center justify-between border-b bg-white px-4 py-3">
           <Link to="/admin" className="flex items-center gap-2 font-bold">

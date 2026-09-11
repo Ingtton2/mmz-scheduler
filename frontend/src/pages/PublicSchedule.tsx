@@ -64,31 +64,51 @@ export default function PublicSchedule() {
 
       <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
         <span>
-          <span className="rounded bg-emerald-100 px-1 text-emerald-800">FO</span>{" "}
+          <span className="rounded-full bg-mint px-1.5 py-0.5 font-semibold text-mint-ink">
+            FO
+          </span>{" "}
           홀오픈
         </span>
         <span>
-          <span className="rounded bg-emerald-200 px-1 text-emerald-900">FC</span>{" "}
+          <span className="rounded-full bg-mint px-1.5 py-0.5 font-semibold text-mint-ink">
+            FC
+          </span>{" "}
           홀마감
         </span>
         <span>
-          <span className="rounded bg-sky-100 px-1 text-sky-800">BO</span> 주방오픈
+          <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+            BO
+          </span>{" "}
+          주방오픈
         </span>
         <span>
-          <span className="rounded bg-indigo-100 px-1 text-indigo-800">BM</span>{" "}
+          <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+            BM
+          </span>{" "}
           주방미들
         </span>
         <span>
-          <span className="rounded bg-sky-200 px-1 text-sky-900">BC</span> 주방마감
+          <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+            BC
+          </span>{" "}
+          주방마감
         </span>
         <span>
-          <span className="rounded bg-teal-100 px-1 text-teal-800">풀</span> 풀오마
+          <span className="rounded-full bg-[#F3E9D2] px-1.5 py-0.5 font-semibold text-primary">
+            풀
+          </span>{" "}
+          풀오마
         </span>
         <span>
-          <span className="rounded bg-gray-100 px-1 text-gray-400">휴</span> 휴무
+          <span className="rounded-full bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-400">
+            휴
+          </span>{" "}
+          휴무
         </span>
         <span>
-          <span className="rounded bg-violet-100 px-1 text-violet-800">연</span>{" "}
+          <span className="rounded-full bg-warn px-1.5 py-0.5 font-semibold text-warn-ink">
+            연
+          </span>{" "}
           연차
         </span>
       </div>
@@ -143,12 +163,20 @@ export default function PublicSchedule() {
                       <td
                         key={d}
                         title={`${d} ${code}`}
-                        className={
-                          "w-8 border-l px-0 py-1 text-center " +
-                          (meta ? meta.cls : "text-gray-300")
-                        }
+                        className="w-8 border-l px-0.5 py-1 text-center"
                       >
-                        {meta ? meta.short : "·"}
+                        {meta ? (
+                          <span
+                            className={
+                              "inline-block w-full rounded-full px-1 py-0.5 text-[11px] leading-none font-semibold " +
+                              meta.cls
+                            }
+                          >
+                            {meta.short}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">·</span>
+                        )}
                       </td>
                     );
                   })}

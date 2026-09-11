@@ -220,7 +220,7 @@ export default function DayOffPage() {
             <button
               type="submit"
               disabled={saving || !hasStaff}
-              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {saving ? "저장 중…" : "사전 휴무 추가"}
             </button>

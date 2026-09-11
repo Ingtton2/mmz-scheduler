@@ -175,7 +175,7 @@ export default function StaffAccountsPage() {
             <button
               type="submit"
               disabled={ownerSaving}
-              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {ownerSaving ? "만드는 중…" : "계정 만들기"}
             </button>
@@ -183,8 +183,11 @@ export default function StaffAccountsPage() {
         </div>
       )}
 
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">
-        승인 대기 ({pending.length})
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+        승인 대기
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+          {pending.length}
+        </span>
       </h2>
       <div className="mb-8 overflow-x-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
@@ -223,7 +226,7 @@ export default function StaffAccountsPage() {
                     <button
                       onClick={() => onApprove(p.account_id)}
                       disabled={busyId === p.account_id}
-                      className="rounded bg-gray-900 px-2 py-1 text-xs text-white disabled:opacity-50"
+                      className="rounded bg-primary hover:bg-primary-dark px-2 py-1 text-xs text-white disabled:opacity-50"
                     >
                       승인
                     </button>
@@ -242,8 +245,11 @@ export default function StaffAccountsPage() {
         </table>
       </div>
 
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">
-        가입된 직원 계정 ({approved.length})
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
+        가입된 직원 계정
+        <span className="rounded-full bg-mint px-2 py-0.5 text-xs font-semibold text-mint-ink">
+          {approved.length}
+        </span>
       </h2>
       {tempPin && (
         <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">

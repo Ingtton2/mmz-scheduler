@@ -40,7 +40,7 @@ export default function MonthFilterBar({
         className={
           "ml-1 rounded px-2 py-1 text-sm " +
           (month === null
-            ? "bg-gray-900 text-white"
+            ? "bg-primary hover:bg-primary-dark text-white"
             : "border text-gray-600 hover:bg-gray-50")
         }
       >

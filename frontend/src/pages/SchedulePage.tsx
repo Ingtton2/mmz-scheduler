@@ -25,22 +25,23 @@ function parseWd(dateStr: string): number {
   return new Date(y, m - 1, d).getDay(); // 0=일 ~ 6=토
 }
 
-// 저장된 코드 -> 화면 표시. 홀(F*)은 초록 계열, 주방(B*)은 파랑 계열.
+// 저장된 코드 -> 화면 표시(뱃지). 홀(F*)은 민트그린, 주방(B*)은 앰버,
+// 연차/사휴는 경고 빨강 계열로 통일 (memeal.zip 디자인 시스템).
 export const CELL: Record<string, { short: string; cls: string }> = {
-  FO: { short: "FO", cls: "bg-emerald-100 text-emerald-800" },
-  FC: { short: "FC", cls: "bg-emerald-200 text-emerald-900" },
-  BO: { short: "BO", cls: "bg-sky-100 text-sky-800" },
-  BM: { short: "BM", cls: "bg-indigo-100 text-indigo-800" },
-  BC: { short: "BC", cls: "bg-sky-200 text-sky-900" },
-  풀오마: { short: "풀", cls: "bg-teal-100 text-teal-800" },
-  사휴: { short: "사", cls: "bg-rose-100 text-rose-700" },
+  FO: { short: "FO", cls: "bg-mint text-mint-ink" },
+  FC: { short: "FC", cls: "bg-mint text-mint-ink" },
+  BO: { short: "BO", cls: "bg-kitchen text-kitchen-ink" },
+  BM: { short: "BM", cls: "bg-kitchen text-kitchen-ink" },
+  BC: { short: "BC", cls: "bg-kitchen text-kitchen-ink" },
+  풀오마: { short: "풀", cls: "bg-[#F3E9D2] text-primary" },
+  사휴: { short: "사", cls: "bg-warn text-warn-ink" },
   "D/O": { short: "휴", cls: "bg-gray-100 text-gray-400" },
-  연차: { short: "연", cls: "bg-violet-100 text-violet-800" },
+  연차: { short: "연", cls: "bg-warn text-warn-ink" },
   // 구버전 저장분 호환
-  O: { short: "O", cls: "bg-emerald-100 text-emerald-800" },
-  M: { short: "M", cls: "bg-sky-100 text-sky-800" },
-  C: { short: "C", cls: "bg-orange-100 text-orange-800" },
-  근무: { short: "근", cls: "bg-emerald-100 text-emerald-800" },
+  O: { short: "O", cls: "bg-mint text-mint-ink" },
+  M: { short: "M", cls: "bg-kitchen text-kitchen-ink" },
+  C: { short: "C", cls: "bg-[#F3E9D2] text-primary" },
+  근무: { short: "근", cls: "bg-mint text-mint-ink" },
 };
 
 const now = new Date();
@@ -209,7 +210,7 @@ export default function SchedulePage() {
         <button
           onClick={handleRun}
           disabled={running}
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {running ? "계산 중…" : "자동배치 실행"}
         </button>
@@ -230,7 +231,7 @@ export default function SchedulePage() {
               <span className="text-amber-600">수동 수정본 · </span>
             )}
             {result.feasible ? (
-              <span className="text-emerald-600">모든 조건 충족</span>
+              <span className="text-mint-ink">모든 조건 충족</span>
             ) : (
               <span className="text-red-600">조건 미충족 (경고 확인)</span>
             )}
@@ -314,7 +315,7 @@ export default function SchedulePage() {
           <button
             onClick={saveEdits}
             disabled={savingEdits}
-            className="rounded bg-gray-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+            className="rounded bg-primary hover:bg-primary-dark px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
           >
             {savingEdits ? "저장 중…" : "수정 저장"}
           </button>
@@ -419,12 +420,22 @@ export default function SchedulePage() {
                           title={`${d} ${code} — 클릭해서 수정`}
                           onClick={() => setEditingCell(key)}
                           className={
-                            "w-8 cursor-pointer border-l px-0 py-1 text-center hover:outline hover:outline-1 hover:outline-gray-400 " +
-                            (meta ? meta.cls : "text-gray-300") +
+                            "w-8 cursor-pointer border-l px-0.5 py-1 text-center hover:outline hover:outline-1 hover:outline-gray-400" +
                             (dirty ? " outline outline-2 outline-amber-500" : "")
                           }
                         >
-                          {meta ? meta.short : "·"}
+                          {meta ? (
+                            <span
+                              className={
+                                "inline-block w-full rounded-full px-1 py-0.5 text-[11px] leading-none font-semibold " +
+                                meta.cls
+                              }
+                            >
+                              {meta.short}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">·</span>
+                          )}
                         </td>
                       );
                     })}
@@ -446,41 +457,37 @@ export default function SchedulePage() {
 }
 
 function Legend() {
+  const pill = "rounded-full px-1.5 py-0.5 font-semibold";
   return (
     <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
       <span className="font-medium text-gray-600">홀:</span>
       <span>
-        <span className="rounded bg-emerald-100 px-1 text-emerald-800">FO</span>{" "}
-        홀오픈
+        <span className={pill + " bg-mint text-mint-ink"}>FO</span> 홀오픈
       </span>
       <span>
-        <span className="rounded bg-emerald-200 px-1 text-emerald-900">FC</span>{" "}
-        홀마감
+        <span className={pill + " bg-mint text-mint-ink"}>FC</span> 홀마감
       </span>
       <span className="ml-2 font-medium text-gray-600">주방:</span>
       <span>
-        <span className="rounded bg-sky-100 px-1 text-sky-800">BO</span> 주방오픈
+        <span className={pill + " bg-kitchen text-kitchen-ink"}>BO</span> 주방오픈
       </span>
       <span>
-        <span className="rounded bg-indigo-100 px-1 text-indigo-800">BM</span>{" "}
-        주방미들
+        <span className={pill + " bg-kitchen text-kitchen-ink"}>BM</span> 주방미들
       </span>
       <span>
-        <span className="rounded bg-sky-200 px-1 text-sky-900">BC</span> 주방마감
+        <span className={pill + " bg-kitchen text-kitchen-ink"}>BC</span> 주방마감
       </span>
       <span className="ml-2">
-        <span className="rounded bg-teal-100 px-1 text-teal-800">풀</span> 풀오마
+        <span className={pill + " bg-[#F3E9D2] text-primary"}>풀</span> 풀오마
       </span>
       <span>
-        <span className="rounded bg-gray-100 px-1 text-gray-400">휴</span> 휴무
+        <span className={pill + " bg-gray-100 text-gray-400"}>휴</span> 휴무
       </span>
       <span>
-        <span className="rounded bg-violet-100 px-1 text-violet-800">연</span>{" "}
-        연차
+        <span className={pill + " bg-warn text-warn-ink"}>연</span> 연차
       </span>
       <span>
-        <span className="rounded bg-rose-100 px-1 text-rose-700">사</span>{" "}
-        사전휴무
+        <span className={pill + " bg-warn text-warn-ink"}>사</span> 사전휴무
       </span>
     </div>
   );
@@ -561,10 +568,10 @@ function ShiftDistribution({ rows }: { rows: ScheduleRow[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-emerald-700">
+                  <td className="px-3 py-1.5 text-right text-mint-ink">
                     {r.summary.hall}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-sky-700">
+                  <td className="px-3 py-1.5 text-right text-kitchen-ink">
                     {r.summary.kitchen}
                   </td>
                   <td className="px-3 py-1.5 text-right">{r.summary.open}</td>
