@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
 from app.config import settings
-from app.database import init_db
+from app.database import engine, init_db
 
 # 관리자 기본 인증에서 제외할 경로 (직원 QR 조회 / 헬스체크는 그대로 열림).
 _OPEN_PREFIXES = ("/health", "/api/public")
@@ -67,8 +67,14 @@ async def admin_basic_auth(request: Request, call_next):
 
 @app.get("/health")
 def health() -> dict:
-    """서버가 살아있는지 확인용."""
-    return {"status": "ok", "app": "mmz-scheduler"}
+    """서버가 살아있는지 + 어떤 DB 에 붙어 있는지 확인용 (비밀번호 등은 노출 안 함)."""
+    return {
+        "status": "ok",
+        "app": "mmz-scheduler",
+        "db": engine.dialect.name,  # "postgresql" 이어야 정상 (배포 환경). 로컬은 "sqlite".
+        "public_base_url": settings.public_base_url,
+        "frontend_origins": settings.cors_origins,
+    }
 
 
 # 실제 기능 주소들 (/api/...)
