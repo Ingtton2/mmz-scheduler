@@ -6,7 +6,6 @@
        http://localhost:8000/docs     (API 자동 문서 / 테스트 화면)
 """
 
-import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -15,9 +14,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import api_router
 from app.config import settings
 from app.database import engine, init_db
+from app.services.auth_tokens import verify_token
 
-# 관리자 기본 인증에서 제외할 경로 (직원 QR 조회 / 헬스체크는 그대로 열림).
-_OPEN_PREFIXES = ("/health", "/api/public")
+# 관리자 로그인에서 제외할 경로
+# (직원 QR 조회 / 헬스체크 / 로그인 자체는 로그인 없이 열려 있어야 함).
+_OPEN_PREFIXES = ("/health", "/api/public", "/api/auth")
 
 
 @asynccontextmanager
@@ -40,27 +41,19 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def admin_basic_auth(request: Request, call_next):
-    """ADMIN_USER / ADMIN_PASS 환경변수가 있으면 관리자 API 에 HTTP 기본 인증을 건다."""
+async def admin_auth(request: Request, call_next):
+    """ADMIN_USER / ADMIN_PASS 환경변수가 있으면, 로그인 토큰(Authorization: Bearer ...)이
+    있어야 관리자 API 를 쓸 수 있다. 토큰은 POST /api/auth/login 으로 받는다."""
     if settings.admin_auth_enabled and request.method != "OPTIONS":
         path = request.url.path
         if not any(path.startswith(p) for p in _OPEN_PREFIXES):
-            ok = False
             auth = request.headers.get("authorization", "")
-            if auth.startswith("Basic "):
-                import base64
-
-                try:
-                    user, _, pw = base64.b64decode(auth[6:]).decode().partition(":")
-                    ok = secrets.compare_digest(user, settings.admin_user) and (
-                        secrets.compare_digest(pw, settings.admin_pass)
-                    )
-                except Exception:
-                    ok = False
-            if not ok:
+            token = auth[len("Bearer ") :] if auth.startswith("Bearer ") else ""
+            if not verify_token(token):
                 return Response(
                     status_code=401,
-                    headers={"WWW-Authenticate": 'Basic realm="mmz-scheduler"'},
+                    content='{"detail":"로그인이 필요합니다."}',
+                    media_type="application/json",
                 )
     return await call_next(request)
 

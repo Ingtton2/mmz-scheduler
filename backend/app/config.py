@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     # QR 코드에 들어갈 공개 URL의 앞부분 (직원이 접속할 프론트엔드 주소).
     public_base_url: str = "http://localhost:5173"
 
-    # (선택) 관리자 API 보호용 아이디/비밀번호. 둘 다 있으면 /api 에 기본 인증이 걸림
-    # ('/api/public/*', '/health' 는 예외 — 직원 QR 조회는 그대로 열림).
+    # 관리자 화면 로그인용 아이디/비밀번호. 둘 다 있으면 /admin 전체에 로그인이 걸림
+    # ('/api/public/*', '/health', '/api/auth/*' 는 예외 — 직원 QR 조회·로그인 자체는 그대로 열림).
+    # 배포 시에는 반드시 설정할 것 (관리자 화면이 인터넷에 공개되어 있으므로).
     admin_user: str = ""
     admin_pass: str = ""
 

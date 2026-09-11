@@ -13,6 +13,7 @@ app/main.py 가 이걸 "/api" 접두어로 앱에 연결합니다.
 from fastapi import APIRouter
 
 from app.api import (
+    routes_auth,
     routes_dayoff,
     routes_leave,
     routes_public,
@@ -22,6 +23,7 @@ from app.api import (
 )
 
 api_router = APIRouter()
+api_router.include_router(routes_auth.router)
 api_router.include_router(routes_staff.router)
 api_router.include_router(routes_leave.router)
 api_router.include_router(routes_dayoff.router)
