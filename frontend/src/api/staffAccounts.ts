@@ -20,9 +20,20 @@ export interface Account {
   approved_at: string | null;
 }
 
+export interface OwnerWithoutAccount {
+  id: number;
+  name: string;
+  position: string;
+  role: string;
+}
+
 export const listAccounts = () => apiGet<Account[]>("/staff-accounts");
 
 export const listPendingAccounts = () => apiGet<PendingAccount[]>("/staff-accounts/pending");
+
+// 사장님은 공개 가입 목록(/join)엔 안 보이므로, 관리자 화면에서 대신 계정을 만들어준다.
+export const listOwnersWithoutAccount = () =>
+  apiGet<OwnerWithoutAccount[]>("/staff-accounts/owners-without-account");
 
 export const approveAccount = (accountId: number) =>
   apiSend<Account>("POST", `/staff-accounts/${accountId}/approve`);

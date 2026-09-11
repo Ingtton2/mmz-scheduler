@@ -4,28 +4,41 @@ import { Link } from "react-router-dom";
 import {
   approveAccount,
   listAccounts,
+  listOwnersWithoutAccount,
   listPendingAccounts,
   rejectAccount,
   resetPin,
   type Account,
+  type OwnerWithoutAccount,
   type PendingAccount,
 } from "../api/staffAccounts";
+import { signup } from "../api/me";
+import { MeApiError } from "../api/meClient";
 import { LABEL } from "../labels";
 
 export default function StaffAccountsPage() {
   const [pending, setPending] = useState<PendingAccount[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [ownersWithoutAccount, setOwnersWithoutAccount] = useState<OwnerWithoutAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [tempPin, setTempPin] = useState<{ staffId: number; pin: string } | null>(null);
 
+  const [ownerForm, setOwnerForm] = useState({ staffId: "", pin: "", pin2: "" });
+  const [ownerSaving, setOwnerSaving] = useState(false);
+
   async function refresh() {
     setLoading(true);
     try {
-      const [p, a] = await Promise.all([listPendingAccounts(), listAccounts()]);
+      const [p, a, o] = await Promise.all([
+        listPendingAccounts(),
+        listAccounts(),
+        listOwnersWithoutAccount(),
+      ]);
       setPending(p);
       setAccounts(a);
+      setOwnersWithoutAccount(o);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "불러오기 실패");
@@ -76,6 +89,24 @@ export default function StaffAccountsPage() {
     }
   }
 
+  async function onOwnerSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (!ownerForm.staffId) return setError("계정을 만들 사장님을 선택해 주세요.");
+    if (!/^\d{4}$/.test(ownerForm.pin)) return setError("PIN은 숫자 4자리여야 합니다.");
+    if (ownerForm.pin !== ownerForm.pin2) return setError("PIN이 서로 일치하지 않습니다.");
+    setOwnerSaving(true);
+    try {
+      await signup(Number(ownerForm.staffId), ownerForm.pin);
+      setOwnerForm({ staffId: "", pin: "", pin2: "" });
+      await refresh();
+    } catch (e) {
+      setError(e instanceof MeApiError ? e.message : "계정 만들기에 실패했습니다.");
+    } finally {
+      setOwnerSaving(false);
+    }
+  }
+
   const approved = accounts.filter((a) => a.status === "approved");
 
   return (
@@ -97,6 +128,59 @@ export default function StaffAccountsPage() {
 
       {error && (
         <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+
+      {!loading && ownersWithoutAccount.length > 0 && (
+        <div className="mb-8 rounded-lg border bg-white p-4">
+          <h2 className="mb-1 text-sm font-semibold text-gray-700">사장님 계정 만들기</h2>
+          <p className="mb-3 text-xs text-gray-500">
+            사장님은 직원 가입 화면(<code className="rounded bg-gray-100 px-1">/join</code>)에
+            안 보여요. 여기서 바로 계정을 만들면 승인 없이 즉시 로그인할 수 있습니다.
+          </p>
+          <form onSubmit={onOwnerSignup} className="flex flex-wrap items-end gap-3">
+            <select
+              className="rounded border border-gray-300 px-3 py-2 text-sm"
+              value={ownerForm.staffId}
+              onChange={(e) => setOwnerForm({ ...ownerForm, staffId: e.target.value })}
+            >
+              <option value="">사장님 선택</option>
+              {ownersWithoutAccount.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="PIN 4자리"
+              className="w-28 rounded border border-gray-300 px-3 py-2 text-sm"
+              value={ownerForm.pin}
+              onChange={(e) =>
+                setOwnerForm({ ...ownerForm, pin: e.target.value.replace(/\D/g, "").slice(0, 4) })
+              }
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              placeholder="PIN 확인"
+              className="w-28 rounded border border-gray-300 px-3 py-2 text-sm"
+              value={ownerForm.pin2}
+              onChange={(e) =>
+                setOwnerForm({ ...ownerForm, pin2: e.target.value.replace(/\D/g, "").slice(0, 4) })
+              }
+            />
+            <button
+              type="submit"
+              disabled={ownerSaving}
+              className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {ownerSaving ? "만드는 중…" : "계정 만들기"}
+            </button>
+          </form>
+        </div>
       )}
 
       <h2 className="mb-2 text-sm font-semibold text-gray-700">

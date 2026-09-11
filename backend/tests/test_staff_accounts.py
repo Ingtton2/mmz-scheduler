@@ -79,19 +79,23 @@ def test_invalid_pin_format_rejected(client: TestClient):
     assert res2.status_code == 422
 
 
-def test_owner_signup_rejected(client: TestClient):
-    """사장님은 셀프서비스 계정이 필요 없다 (어차피 관리자 화면을 그대로 씀) — 가입 자체가 막혀야 함."""
+def test_owner_signup_auto_approved(client: TestClient):
     oid = _make_staff(client, "사장님계정", role="owner", position="both")
     res = client.post("/api/public/staff-accounts/signup", json={"staff_id": oid, "pin": "9999"})
-    assert res.status_code == 400
+    assert res.status_code == 201
+    assert res.json()["status"] == "approved"
 
-    # 로그인도 당연히 안 됨 (계정이 없으므로).
-    login = client.post("/api/public/staff-accounts/login", json={"staff_id": oid, "pin": "9999"})
-    assert login.status_code == 401
+    # 승인 대기 목록엔 안 뜸 (이미 승인됨)
+    pending = client.get("/api/staff-accounts/pending").json()
+    assert oid not in [p["staff_id"] for p in pending]
+
+    # 바로 로그인 가능
+    ok = client.post("/api/public/staff-accounts/login", json={"staff_id": oid, "pin": "9999"})
+    assert ok.status_code == 200
 
 
 def test_owner_hidden_from_public_signup_list(client: TestClient):
-    """사장님은 공개 가입 화면(/join)에 안 보여야 한다."""
+    """사장님은 공개 가입 화면(/join)에 안 보여야 한다 — 관리자 화면에서 따로 계정을 만든다."""
     oid = _make_staff(client, "숨겨질사장님", role="owner", position="both")
     sid = _make_staff(client, "보일직원")
 
@@ -99,6 +103,20 @@ def test_owner_hidden_from_public_signup_list(client: TestClient):
     ids = [a["id"] for a in avail]
     assert oid not in ids
     assert sid in ids
+
+    # 관리자 화면에는 "계정 없는 사장님" 목록으로 뜬다.
+    owners = client.get("/api/staff-accounts/owners-without-account").json()
+    assert oid in [o["id"] for o in owners]
+
+    # 관리자 화면에서 사장님 계정을 만들면 -> 즉시 승인, 그리고 그 목록에서 빠짐
+    res = client.post(
+        "/api/public/staff-accounts/signup", json={"staff_id": oid, "pin": "4321"}
+    )
+    assert res.status_code == 201
+    assert res.json()["status"] == "approved"
+
+    owners_after = client.get("/api/staff-accounts/owners-without-account").json()
+    assert oid not in [o["id"] for o in owners_after]
 
 
 def test_reject_removes_and_allows_resignup(client: TestClient):
