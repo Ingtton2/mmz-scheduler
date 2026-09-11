@@ -2,7 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
-      "//": "↓↓↓ 이 주소를 Render 백엔드 주소로 바꾸세요 (docs/DEPLOY.md 4-3 참고) ↓↓↓",
       "source": "/api/:path*",
       "destination": "https://mmz-scheduler-api.onrender.com/api/:path*"
     },
