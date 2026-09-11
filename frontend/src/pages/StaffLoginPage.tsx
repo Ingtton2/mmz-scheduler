@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { listLoginable, login, type LoginableStaff } from "../api/me";
 import { MeApiError, setStaffToken } from "../api/meClient";
+import logo from "../assets/logo.png";
 
 export default function StaffLoginPage() {
   const [staff, setStaff] = useState<LoginableStaff[]>([]);
@@ -46,8 +47,9 @@ export default function StaffLoginPage() {
 
   return (
     <div className="mx-auto mt-16 max-w-sm rounded-lg border bg-white p-6 shadow-sm">
-      <h1 className="mb-1 text-lg font-bold">직원 로그인</h1>
-      <p className="mb-5 text-sm text-gray-500">
+      <img src={logo} alt="memeal.zip" className="mx-auto mb-4 h-16 w-16 rounded" />
+      <h1 className="mb-1 text-center text-lg font-bold">직원 로그인</h1>
+      <p className="mb-5 text-center text-sm text-gray-500">
         이름을 선택하고 PIN을 입력하세요.
       </p>
       <form onSubmit={onSubmit} className="space-y-3">

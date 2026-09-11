@@ -15,7 +15,7 @@ const MENU = [
 export default function AdminHome() {
   return (
     <div>
-      <h1 className="mb-1 text-xl font-bold">사장님 관리자 화면</h1>
+      <h1 className="mb-1 text-xl font-bold">memeal.zip 근태관리</h1>
       <p className="mb-6 text-sm text-gray-500">
         메뉴를 눌러 각 기능으로 이동합니다.
       </p>

@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
 import { ApiError, setToken } from "../api/client";
+import logo from "../assets/logo.png";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -31,8 +32,9 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto mt-24 max-w-sm rounded-lg border bg-white p-6 shadow-sm">
-      <h1 className="mb-1 text-lg font-bold">관리자 로그인</h1>
-      <p className="mb-5 text-sm text-gray-500">
+      <img src={logo} alt="memeal.zip" className="mx-auto mb-4 h-16 w-16 rounded" />
+      <h1 className="mb-1 text-center text-lg font-bold">관리자 로그인</h1>
+      <p className="mb-5 text-center text-sm text-gray-500">
         사장님만 이 화면 뒤 관리자 기능을 사용할 수 있어요.
       </p>
       <form onSubmit={onSubmit} className="space-y-3">

@@ -28,6 +28,7 @@ import MySchedulePage from "./pages/me/MySchedulePage";
 import RequireAuth from "./RequireAuth";
 import RequireStaffAuth from "./RequireStaffAuth";
 import { getAuthStatus, logout as apiLogout } from "./api/auth";
+import logo from "./assets/logo.png";
 import { clearToken, getToken } from "./api/client";
 
 function LogoutButton() {
@@ -75,8 +76,9 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       {isAdminChrome && (
         <header className="flex items-center justify-between border-b bg-white px-4 py-3">
-          <Link to="/admin" className="font-bold">
-            mmz-scheduler
+          <Link to="/admin" className="flex items-center gap-2 font-bold">
+            <img src={logo} alt="" className="h-7 w-7 rounded" />
+            memeal.zip
           </Link>
           <LogoutButton />
         </header>
