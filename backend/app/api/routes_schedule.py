@@ -33,6 +33,7 @@ from app.models.base import date_range, utcnow
 from app.scheduler.engine import SolveInput, StaffInput, build_schedule
 from app.schemas.staff import has_leave_balance
 from app.services.schedule_summary import summarize as _summarize
+from app.services.schedule_window import can_manual_edit, can_run_auto_schedule
 from app.schemas.schedule import (
     VALID_CODES,
     AutoScheduleRequest,
@@ -45,6 +46,11 @@ from app.schemas.schedule import (
 )
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
+
+
+def _today() -> date:
+    """테스트에서 monkeypatch 하기 쉽게 date.today() 를 함수로 감싼다."""
+    return date.today()
 
 
 def _load_active_staff(session: Session) -> list[Staff]:
@@ -144,6 +150,12 @@ def _persist(
 def run_auto_schedule(
     payload: AutoScheduleRequest, session: Session = Depends(get_session)
 ) -> ScheduleResult:
+    if not can_run_auto_schedule(payload.year, payload.month, _today()):
+        raise HTTPException(
+            status_code=400,
+            detail="이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요.",
+        )
+
     staff_rows = _load_active_staff(session)
     mdo = _load_min_days_off(session)
 
@@ -282,6 +294,10 @@ def edit_entries(
     payload: ManualEditRequest, session: Session = Depends(get_session)
 ) -> ScheduleResult:
     """사장님이 자동배치 결과의 특정 칸(직원×날짜)을 수동으로 바꾼다 (스펙 6.1)."""
+    if not can_manual_edit(payload.year, payload.month, _today()):
+        raise HTTPException(
+            status_code=400, detail="이전 달 스케줄은 더 이상 수정할 수 없습니다."
+        )
     sched = _get_sched(session, payload.year, payload.month)
 
     for ch in payload.changes:

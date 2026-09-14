@@ -1,6 +1,17 @@
 """수동 수정 + 공유(QR) + 직원 조회 API 테스트 (스펙 6.1, 6.2, 7)."""
 
+from datetime import date
+
+import app.api.routes_schedule as routes_schedule
+import pytest
 from fastapi.testclient import TestClient
+
+# 이 파일의 모든 테스트가 2026년 10월을 "다음 달"로 쓰므로, 실제 시계가
+# 2026-10 을 지나도 자동배치 시점 제한(당월 이후 금지)에 안 걸리게
+# "오늘"을 9월로 고정한다.
+@pytest.fixture(autouse=True)
+def _fixed_today(monkeypatch):
+    monkeypatch.setattr(routes_schedule, "_today", lambda: date(2026, 9, 10))
 
 
 def _setup(client: TestClient) -> None:

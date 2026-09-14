@@ -4,10 +4,13 @@
 QR 을 스캔하면 프론트가 /schedule/{공유코드} 로 들어오고, 그 화면이
 이 API 로 스케줄 데이터를 받아 표(이미지 형태)로 보여준다.
 스케줄이 "임시(draft)" 상태면 — 공유 전이거나, 공유 후 다시 수정된 경우 —
-사장님이 다시 "공유"를 누르기 전까지는 여기서 막힌다.
+사장님이 다시 "공유"를 누르기 전까지는 여기서 막힌다. 당월+다음달보다 먼
+미래는 공유 상태와 무관하게 항상 막힌다 (안전장치).
 
-  GET /api/public/schedule/{share_code}  -> 공유된 스케줄 (없거나 아직 임시면 404)
+  GET /api/public/schedule/{share_code}  -> 공유된 스케줄 (없거나 아직 안 보일 때 404)
 """
+
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -16,8 +19,14 @@ from app.database import get_session
 from app.models import Schedule
 from app.schemas.schedule import PublicScheduleResult
 from app.services.schedule_view import build_public_view
+from app.services.schedule_window import within_employee_visible_range
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+
+def _today() -> date:
+    """테스트에서 monkeypatch 하기 쉽게 date.today() 를 함수로 감싼다."""
+    return date.today()
 
 
 @router.get("/schedule/{share_code}", response_model=PublicScheduleResult)
@@ -29,7 +38,9 @@ def public_schedule(
     ).first()
     if sched is None:
         raise HTTPException(status_code=404, detail="스케줄을 찾을 수 없습니다.")
-    if sched.status != "confirmed":
+    if sched.status != "confirmed" or not within_employee_visible_range(
+        sched.year, sched.month, _today()
+    ):
         raise HTTPException(status_code=404, detail="아직 스케줄이 공유되지 않았습니다.")
 
     return build_public_view(session, sched)

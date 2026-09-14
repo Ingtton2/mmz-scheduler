@@ -263,7 +263,7 @@ def my_schedule(
     staff: Staff = Depends(get_current_staff),
     session: Session = Depends(get_session),
 ) -> MyScheduleResult:
-    sched = get_confirmed_schedule(session, year, month)
+    sched = get_confirmed_schedule(session, year, month, today=_today())
     if sched is None:
         raise HTTPException(status_code=404, detail="아직 스케줄이 공유되지 않았습니다.")
 
@@ -291,7 +291,7 @@ def my_team_schedule(
     session: Session = Depends(get_session),
 ) -> PublicScheduleResult:
     """동료 근무일 확인/대타 부탁용 — 이번 달 전체 직원 스케줄 (공유된 것만)."""
-    sched = get_confirmed_schedule(session, year, month)
+    sched = get_confirmed_schedule(session, year, month, today=_today())
     if sched is None:
         raise HTTPException(status_code=404, detail="아직 스케줄이 공유되지 않았습니다.")
     return build_public_view(session, sched)

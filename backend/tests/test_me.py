@@ -3,6 +3,7 @@
 from datetime import date
 
 import app.api.routes_me as routes_me
+import app.api.routes_schedule as routes_schedule
 from fastapi.testclient import TestClient
 
 
@@ -150,7 +151,8 @@ def test_dayoff_month_quota_enforced_for_self_service(client: TestClient, monkey
     assert big.status_code == 422
 
 
-def test_my_schedule_returns_only_own_cells(client: TestClient):
+def test_my_schedule_returns_only_own_cells(client: TestClient, monkeypatch):
+    monkeypatch.setattr(routes_schedule, "_today", lambda: date(2026, 9, 10))
     a_id, a_token = _signup_and_approve(client, "스케줄본인A")
     b_id, _ = _signup_and_approve(client, "스케줄본인B")
 
@@ -184,19 +186,22 @@ def test_my_schedule_returns_only_own_cells(client: TestClient):
     assert body["summary"]["hall"] >= 1
 
 
-def test_team_schedule_requires_shared_status(client: TestClient):
+def test_team_schedule_requires_shared_status(client: TestClient, monkeypatch):
     """동료 스케줄 전체 조회 — 공유되기 전엔 로그인해도 안 보여야 한다."""
+    monkeypatch.setattr(routes_schedule, "_today", lambda: date(2026, 9, 10))
+    monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 10))
     a_id, a_token = _signup_and_approve(client, "동료본인")
     b_id, _ = _signup_and_approve(client, "동료B")
 
-    assert client.post("/api/schedule/auto", json={"year": 2026, "month": 11}).status_code == 200
+    # "오늘"을 9/10 으로 고정 -> 다음 달인 10월 스케줄로 테스트.
+    assert client.post("/api/schedule/auto", json={"year": 2026, "month": 10}).status_code == 200
 
     # 아직 공유 전 -> 로그인했어도 전체 스케줄 안 보임
-    blocked = client.get("/api/me/team-schedule/2026/11", headers=_auth(a_token))
+    blocked = client.get("/api/me/team-schedule/2026/10", headers=_auth(a_token))
     assert blocked.status_code == 404
 
-    client.post("/api/schedule/2026/11/share")
-    ok = client.get("/api/me/team-schedule/2026/11", headers=_auth(a_token))
+    client.post("/api/schedule/2026/10/share")
+    ok = client.get("/api/me/team-schedule/2026/10", headers=_auth(a_token))
     assert ok.status_code == 200
     body = ok.json()
     names = [r["staff_name"] for r in body["rows"]]

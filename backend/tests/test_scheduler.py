@@ -402,7 +402,12 @@ def _mk(client: TestClient, name: str, position: str, role: str = "staff",
     return client.post("/api/staff", json=body).json()["id"]
 
 
-def test_auto_schedule_endpoint(client: TestClient):
+def test_auto_schedule_endpoint(client: TestClient, monkeypatch):
+    import app.api.routes_schedule as routes_schedule
+
+    # 2026-10 을 "다음 달"로 취급하도록 오늘을 고정 (자동배치 시점 제한 대비).
+    monkeypatch.setattr(routes_schedule, "_today", lambda: date(2026, 9, 10))
+
     _mk(client, "홀A", "hall")
     _mk(client, "겸직A", "both")
     _mk(client, "주1", "kitchen")

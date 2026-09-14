@@ -49,6 +49,15 @@ const NEXT_MONTH = now.getMonth() + 2 > 12 ? 1 : now.getMonth() + 2;
 const NEXT_MONTH_YEAR =
   now.getMonth() + 2 > 12 ? now.getFullYear() + 1 : now.getFullYear();
 
+// 시점(당월 기준) 제한 — 서버가 최종 판단하지만, 화면에서도 미리 막아서
+// 헷갈리지 않게 한다. ym 을 정수 하나로 비교(연*12+월)해서 대소비교를 간단히 함.
+const ymValue = (y: number, m: number) => y * 12 + m;
+const CURRENT_YM = ymValue(now.getFullYear(), now.getMonth() + 1);
+// 자동배치(전체 재계산): 당월 포함 과거는 금지, 다음 달부터만 가능.
+const isAutoScheduleBlocked = (y: number, m: number) => ymValue(y, m) <= CURRENT_YM;
+// 수동 수정(칸 단위): 과거(당월 이전)만 금지, 당월부터는 계속 가능.
+const isManualEditBlocked = (y: number, m: number) => ymValue(y, m) < CURRENT_YM;
+
 const cellKey = (staffId: number, date: string) => `${staffId}|${date}`;
 
 export default function SchedulePage() {
@@ -186,6 +195,7 @@ export default function SchedulePage() {
 
   const years = [now.getFullYear(), now.getFullYear() + 1];
   const shownWarnings = result?.warnings.slice(0, 25) ?? [];
+  const editLocked = isManualEditBlocked(year, month);
 
   return (
     <div>
@@ -235,7 +245,12 @@ export default function SchedulePage() {
         </label>
         <button
           onClick={handleRun}
-          disabled={running}
+          disabled={running || isAutoScheduleBlocked(year, month)}
+          title={
+            isAutoScheduleBlocked(year, month)
+              ? "이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요."
+              : ""
+          }
           className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           {running ? "계산 중…" : "자동배치 실행"}
@@ -286,6 +301,18 @@ export default function SchedulePage() {
           </span>
         )}
       </div>
+
+      {isAutoScheduleBlocked(year, month) && (
+        <p className="mb-4 text-sm text-amber-700">
+          이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달
+          스케줄부터 가능해요. (급한 변경은 표의 칸을 직접 클릭해서 수정하세요.)
+        </p>
+      )}
+      {isManualEditBlocked(year, month) && (
+        <p className="mb-4 text-sm text-red-600">
+          이전 달 스케줄은 더 이상 수정할 수 없습니다.
+        </p>
+      )}
 
       {/* 공유 패널 */}
       {share && (
@@ -443,7 +470,7 @@ export default function SchedulePage() {
                       const meta = CELL[code];
                       const dirty = key in edits;
 
-                      if (editingCell === key) {
+                      if (editingCell === key && !editLocked) {
                         return (
                           <td key={d} className="w-8 border-l p-0 text-center">
                             <select
@@ -467,10 +494,17 @@ export default function SchedulePage() {
                       return (
                         <td
                           key={d}
-                          title={`${d} ${code} — 클릭해서 수정`}
-                          onClick={() => setEditingCell(key)}
+                          title={
+                            editLocked
+                              ? `${d} ${code} — 이전 달 스케줄은 수정할 수 없습니다.`
+                              : `${d} ${code} — 클릭해서 수정`
+                          }
+                          onClick={editLocked ? undefined : () => setEditingCell(key)}
                           className={
-                            "w-8 cursor-pointer border-l px-0.5 py-1 text-center hover:outline hover:outline-1 hover:outline-gray-400" +
+                            "w-8 border-l px-0.5 py-1 text-center" +
+                            (editLocked
+                              ? " cursor-not-allowed opacity-60"
+                              : " cursor-pointer hover:outline hover:outline-1 hover:outline-gray-400") +
                             (dirty ? " outline outline-2 outline-amber-500" : "")
                           }
                         >
