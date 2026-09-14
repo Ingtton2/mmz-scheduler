@@ -11,7 +11,8 @@ Authorization: Bearer <직원 토큰> 을 직접 검증한다.
   POST /api/me/leave-requests         내 연차 신청 (다음달만, 20일까지 — 스펙 9-5)
   GET  /api/me/dayoff-requests        내 사전휴무 신청 목록
   POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일까지, 월 20일 한도)
-  GET  /api/me/schedule/{year}/{month}  내 스케줄만
+  GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
+  GET  /api/me/team-schedule/{year}/{month}  이번 달 전체 직원 스케줄 (공유된 것만)
 """
 
 from datetime import date
@@ -31,12 +32,14 @@ from app.models import (
     StaffAccount,
 )
 from app.schemas.me import MyDayOffRequestOut, MyLeaveRequestOut, MyRequestCreate, MyScheduleResult
+from app.schemas.schedule import PublicScheduleResult
 from app.schemas.staff_account import ChangePinRequest, MeOut
 from app.services import pin as pin_service
 from app.services import staff_tokens
 from app.services.date_overlap import days_by_month, overlaps
 from app.services.request_window import check_window
 from app.services.schedule_summary import summarize
+from app.services.schedule_view import build_public_view, get_confirmed_schedule
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -260,15 +263,9 @@ def my_schedule(
     staff: Staff = Depends(get_current_staff),
     session: Session = Depends(get_session),
 ) -> MyScheduleResult:
-    sched = session.exec(
-        select(Schedule).where(
-            Schedule.store_id == DEFAULT_STORE_ID,
-            Schedule.year == year,
-            Schedule.month == month,
-        )
-    ).first()
+    sched = get_confirmed_schedule(session, year, month)
     if sched is None:
-        raise HTTPException(status_code=404, detail="아직 저장된 스케줄이 없습니다.")
+        raise HTTPException(status_code=404, detail="아직 스케줄이 공유되지 않았습니다.")
 
     entries = session.exec(
         select(ScheduleEntry).where(
@@ -284,3 +281,17 @@ def my_schedule(
         summary=summarize(cells),
         generated_at=sched.created_at,
     )
+
+
+@router.get("/team-schedule/{year}/{month}", response_model=PublicScheduleResult)
+def my_team_schedule(
+    year: int,
+    month: int,
+    staff: Staff = Depends(get_current_staff),  # noqa: ARG001 — 로그인만 확인하면 됨
+    session: Session = Depends(get_session),
+) -> PublicScheduleResult:
+    """동료 근무일 확인/대타 부탁용 — 이번 달 전체 직원 스케줄 (공유된 것만)."""
+    sched = get_confirmed_schedule(session, year, month)
+    if sched is None:
+        raise HTTPException(status_code=404, detail="아직 스케줄이 공유되지 않았습니다.")
+    return build_public_view(session, sched)

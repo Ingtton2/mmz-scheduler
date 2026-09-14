@@ -58,6 +58,7 @@ class ScheduleResult(BaseModel):
     solve_seconds: float = 0.0
     saved: bool = False
     edited: bool = False        # 수동 수정된 스케줄인지
+    status: str = "draft"       # "draft"(임시) / "confirmed"(공유됨) — 직원 노출 여부를 가름
     share_code: str | None = None
     generated_at: datetime | None = None
 

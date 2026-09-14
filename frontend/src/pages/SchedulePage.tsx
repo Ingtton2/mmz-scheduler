@@ -3,8 +3,9 @@
 //  - 표의 셀을 클릭해서 근무 코드를 바꾸고 "수정 저장" -> 반영
 //  - "공유" -> 고유 URL + QR 발급 (직원은 QR 스캔으로 로그인 없이 그 달 표를 봄)
 //  - 근무 코드: 홀 FO/FC · 주방 BO/BM/BC · 파트타임 풀오마
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import html2canvas from "html2canvas";
 import {
   EDIT_CODES,
   editScheduleEntries,
@@ -68,6 +69,10 @@ export default function SchedulePage() {
   const [share, setShare] = useState<ShareResult | null>(null);
   const [sharing, setSharing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // 이미지 다운로드 (확정된 스케줄만)
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const dirtyCount = Object.keys(edits).length;
 
@@ -151,10 +156,32 @@ export default function SchedulePage() {
       setShare(await shareSchedule(year, month));
       setCopied(false);
       setError("");
+      // 서버가 상태를 "confirmed" 로 바꿨으므로 화면에도 바로 반영 (재조회 없이).
+      setResult((r) => (r ? { ...r, status: "confirmed" } : r));
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setSharing(false);
+    }
+  }
+
+  async function handleDownloadImage() {
+    if (!gridRef.current) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(gridRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+      });
+      const url = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `메밀집_스케줄_${year}-${String(month).padStart(2, "0")}.png`;
+      a.click();
+    } catch {
+      setError("이미지 생성에 실패했습니다.");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -224,6 +251,28 @@ export default function SchedulePage() {
             {sharing ? "생성 중…" : "공유 (QR)"}
           </button>
         )}
+        {result?.saved && result.status === "confirmed" && (
+          <button
+            onClick={handleDownloadImage}
+            disabled={downloading}
+            title="확정된 스케줄을 이미지(PNG)로 저장"
+            className="rounded border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {downloading ? "생성 중…" : "이미지 다운로드"}
+          </button>
+        )}
+        {result?.saved && (
+          <span
+            className={
+              "rounded-full px-2 py-0.5 text-xs font-semibold " +
+              (result.status === "confirmed"
+                ? "bg-mint text-mint-ink"
+                : "bg-amber-100 text-amber-800")
+            }
+          >
+            {result.status === "confirmed" ? "공유됨 (직원에게 노출)" : "임시 (직원에게 안 보임)"}
+          </span>
+        )}
         {result?.saved && (
           <span className="text-xs text-gray-400">
             {result.solve_seconds > 0 && <>계산 {result.solve_seconds}s · </>}
@@ -276,7 +325,9 @@ export default function SchedulePage() {
             </div>
             <p className="mt-2 text-xs text-gray-400">
               QR을 인쇄하거나 카톡으로 보내면, 직원은 로그인 없이 이 달 근무표를
-              봅니다. 스케줄을 수정하면 같은 링크에 최신 내용이 반영됩니다.
+              봅니다. 링크 주소는 계속 같지만, 공유 뒤에 스케줄을 또 수정하면
+              다시 “임시” 상태로 바뀌어 직원 화면에서 안 보여요 — 수정을 끝내고
+              “공유” 버튼을 다시 눌러야 최신 내용이 반영됩니다.
             </p>
           </div>
         </div>
@@ -347,7 +398,7 @@ export default function SchedulePage() {
       ) : (
         <>
           <Legend />
-          <div className="overflow-x-auto rounded-lg border bg-white">
+          <div ref={gridRef} className="overflow-x-auto rounded-lg border bg-white">
             <table className="border-collapse text-xs">
               <thead>
                 <tr className="border-b bg-gray-50">

@@ -98,3 +98,59 @@ def test_share_and_public_view(client: TestClient):
 
 def test_public_unknown_code_404(client: TestClient):
     assert client.get("/api/public/schedule/nope").status_code == 404
+
+
+def test_draft_hidden_until_shared(client: TestClient):
+    """자동배치 직후(공유 전)엔 상태가 draft 이고, 공유코드가 있어도 아직 안 뜬다."""
+    _setup(client)
+    saved = client.get("/api/schedule", params={"year": 2026, "month": 10}).json()
+    assert saved["status"] == "draft"
+
+    # 먼저 공유해서 코드를 받아두되, 다시 draft 로 되돌려 코드가 있어도 막히는지 확인.
+    code = client.post("/api/schedule/2026/10/share").json()["share_code"]
+    assert client.get(f"/api/public/schedule/{code}").status_code == 200
+
+    # 다시 자동배치를 돌리면 (재계산) 임시로 되돌아가야 한다.
+    client.post("/api/schedule/auto", json={"year": 2026, "month": 10})
+    again = client.get("/api/schedule", params={"year": 2026, "month": 10}).json()
+    assert again["status"] == "draft"
+    assert again["share_code"] == code  # 코드 자체는 유지됨
+
+    blocked = client.get(f"/api/public/schedule/{code}")
+    assert blocked.status_code == 404
+    assert "공유되지" in blocked.json()["detail"]
+
+
+def test_edit_after_share_reverts_then_reshare_reveals(client: TestClient):
+    """임시 -> 공유 -> (재수정) -> 다시 임시 -> 재공유 -> 다시 노출 흐름 전체 확인."""
+    _setup(client)
+    body = client.get("/api/schedule", params={"year": 2026, "month": 10}).json()
+    sid = body["rows"][0]["staff_id"]
+    day = body["days"][5]
+
+    # 1) 공유 -> confirmed, 공개 화면에 보임
+    code = client.post("/api/schedule/2026/10/share").json()["share_code"]
+    assert client.get("/api/schedule", params={"year": 2026, "month": 10}).json()["status"] == "confirmed"
+    assert client.get(f"/api/public/schedule/{code}").status_code == 200
+
+    # 2) 공유 후 수정 -> 다시 draft, 공개 화면에서 사라짐
+    edit = client.patch(
+        "/api/schedule/entries",
+        json={
+            "year": 2026,
+            "month": 10,
+            "changes": [{"staff_id": sid, "work_date": day, "work_code": "연차"}],
+        },
+    )
+    assert edit.json()["status"] == "draft"
+    hidden = client.get(f"/api/public/schedule/{code}")
+    assert hidden.status_code == 404
+    assert "공유되지" in hidden.json()["detail"]
+
+    # 3) 재공유 -> 다시 confirmed, 같은 코드로 다시 보임 + 수정 내용 반영
+    reshare = client.post("/api/schedule/2026/10/share")
+    assert reshare.json()["share_code"] == code  # 같은 링크/QR 재사용
+    again = client.get(f"/api/public/schedule/{code}")
+    assert again.status_code == 200
+    changed_row = next(r for r in again.json()["rows"] if r["staff_name"] == body["rows"][0]["staff_name"])
+    assert changed_row["cells"][day] == "연차"

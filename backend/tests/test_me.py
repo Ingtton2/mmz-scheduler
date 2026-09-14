@@ -170,6 +170,11 @@ def test_my_schedule_returns_only_own_cells(client: TestClient):
         },
     )
 
+    # 아직 공유 전(임시) 이라 본인 스케줄도 안 보여야 함.
+    assert client.get("/api/me/schedule/2026/10", headers=_auth(a_token)).status_code == 404
+
+    assert client.post("/api/schedule/2026/10/share").status_code == 200
+
     res = client.get("/api/me/schedule/2026/10", headers=_auth(a_token))
     assert res.status_code == 200
     body = res.json()
@@ -177,3 +182,22 @@ def test_my_schedule_returns_only_own_cells(client: TestClient):
     assert body["cells"]["2026-10-01"] == "FO"
     assert all(code != "FC" for code in body["cells"].values())
     assert body["summary"]["hall"] >= 1
+
+
+def test_team_schedule_requires_shared_status(client: TestClient):
+    """동료 스케줄 전체 조회 — 공유되기 전엔 로그인해도 안 보여야 한다."""
+    a_id, a_token = _signup_and_approve(client, "동료본인")
+    b_id, _ = _signup_and_approve(client, "동료B")
+
+    assert client.post("/api/schedule/auto", json={"year": 2026, "month": 11}).status_code == 200
+
+    # 아직 공유 전 -> 로그인했어도 전체 스케줄 안 보임
+    blocked = client.get("/api/me/team-schedule/2026/11", headers=_auth(a_token))
+    assert blocked.status_code == 404
+
+    client.post("/api/schedule/2026/11/share")
+    ok = client.get("/api/me/team-schedule/2026/11", headers=_auth(a_token))
+    assert ok.status_code == 200
+    body = ok.json()
+    names = [r["staff_name"] for r in body["rows"]]
+    assert "동료본인" in names and "동료B" in names

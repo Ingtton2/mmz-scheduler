@@ -132,6 +132,9 @@ def _persist(
             )
     sched.created_at = utcnow()
     sched.edited = False  # 자동배치를 다시 돌리면 수동 수정본은 덮어써짐
+    # 자동배치를 (다시) 돌리면 이전에 공유했더라도 항상 "임시" 상태로 되돌린다 —
+    # 사장님이 다시 "공유"를 눌러야 직원들에게 최신본이 보인다.
+    sched.status = "draft"
     session.add(sched)
     session.commit()
     return sched
@@ -206,6 +209,7 @@ def run_auto_schedule(
         solve_seconds=solved.solve_seconds,
         saved=True,
         edited=False,
+        status=sched.status,
         share_code=sched.share_code,
         generated_at=utcnow(),
     )
@@ -258,6 +262,7 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
         feasible=True,
         saved=True,
         edited=sched.edited,
+        status=sched.status,
         share_code=sched.share_code,
         generated_at=sched.created_at,
     )
@@ -304,6 +309,8 @@ def edit_entries(
 
     if payload.changes:
         sched.edited = True
+        # 공유된 뒤에 또 수정하면 다시 "임시"로 — 사장님이 다시 공유해야 직원에게 보임.
+        sched.status = "draft"
         session.add(sched)
     session.commit()
     return _saved_result(session, sched)
@@ -313,13 +320,17 @@ def edit_entries(
 def share_schedule(
     year: int, month: int, session: Session = Depends(get_session)
 ) -> ShareResult:
-    """완성된 스케줄에 고유 공유코드를 붙이고 URL/QR 경로를 돌려준다 (스펙 7)."""
+    """스케줄을 "공유됨(confirmed)" 상태로 바꾸고 URL/QR 경로를 돌려준다 (스펙 7).
+
+    공유코드는 처음 한 번만 새로 발급하고, 그 뒤로는 재사용한다 — 이미 나눠준
+    QR/링크가 그대로 최신 버전을 가리키게 하기 위함. 상태 전환(draft->confirmed)
+    은 재공유 때도 매번 일어나야 한다 (수정 후 재공유 흐름)."""
     sched = _get_sched(session, year, month)
     if not sched.share_code:
         sched.share_code = secrets.token_urlsafe(9)
-        sched.status = "confirmed"
-        session.add(sched)
-        session.commit()
+    sched.status = "confirmed"
+    session.add(sched)
+    session.commit()
     base = settings.public_base_url.rstrip("/")
     return ShareResult(
         share_code=sched.share_code,

@@ -25,6 +25,7 @@ import MyPinChangePage from "./pages/me/MyPinChangePage";
 import MyLeavePage from "./pages/me/MyLeavePage";
 import MyDayOffPage from "./pages/me/MyDayOffPage";
 import MySchedulePage from "./pages/me/MySchedulePage";
+import MyTeamSchedulePage from "./pages/me/MyTeamSchedulePage";
 import RequireAuth from "./RequireAuth";
 import RequireStaffAuth from "./RequireStaffAuth";
 import { getAuthStatus, logout as apiLogout } from "./api/auth";
@@ -196,6 +197,14 @@ export default function App() {
             element={
               <RequireStaffAuth>
                 <MySchedulePage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/team-schedule"
+            element={
+              <RequireStaffAuth>
+                <MyTeamSchedulePage />
               </RequireStaffAuth>
             }
           />

@@ -42,6 +42,7 @@ export interface ScheduleResult {
   solve_seconds: number;
   saved: boolean;
   edited: boolean;
+  status: "draft" | "confirmed";
   share_code: string | null;
   generated_at: string | null;
 }
