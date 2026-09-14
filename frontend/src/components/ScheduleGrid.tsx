@@ -19,52 +19,58 @@ export function ScheduleLegend() {
   return (
     <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
       <span>
-        <span className="rounded-full bg-mint px-1.5 py-0.5 font-semibold text-mint-ink">
+        <span className="rounded-full bg-fo px-1.5 py-0.5 font-semibold text-fo-ink">
           FO
         </span>{" "}
         홀오픈
       </span>
       <span>
-        <span className="rounded-full bg-mint px-1.5 py-0.5 font-semibold text-mint-ink">
+        <span className="rounded-full bg-fc px-1.5 py-0.5 font-semibold text-fc-ink">
           FC
         </span>{" "}
         홀마감
       </span>
       <span>
-        <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+        <span className="rounded-full bg-bo px-1.5 py-0.5 font-semibold text-bo-ink">
           BO
         </span>{" "}
         주방오픈
       </span>
       <span>
-        <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+        <span className="rounded-full bg-bm px-1.5 py-0.5 font-semibold text-bm-ink">
           BM
         </span>{" "}
         주방미들
       </span>
       <span>
-        <span className="rounded-full bg-kitchen px-1.5 py-0.5 font-semibold text-kitchen-ink">
+        <span className="rounded-full bg-bc px-1.5 py-0.5 font-semibold text-bc-ink">
           BC
         </span>{" "}
         주방마감
       </span>
       <span>
-        <span className="rounded-full bg-[#F3E9D2] px-1.5 py-0.5 font-semibold text-primary">
+        <span className="rounded-full bg-full px-1.5 py-0.5 font-semibold text-full-ink">
           풀
         </span>{" "}
         풀오마
       </span>
       <span>
-        <span className="rounded-full bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-400">
+        <span className="rounded-full bg-off px-1.5 py-0.5 font-semibold text-off-ink">
           휴
         </span>{" "}
         휴무
       </span>
       <span>
-        <span className="rounded-full bg-warn px-1.5 py-0.5 font-semibold text-warn-ink">
+        <span className="rounded-full bg-leave px-1.5 py-0.5 font-semibold text-leave-ink">
           연
         </span>{" "}
         연차
+      </span>
+      <span>
+        <span className="rounded-full bg-dayoff px-1.5 py-0.5 font-semibold text-dayoff-ink">
+          사
+        </span>{" "}
+        사전휴무
       </span>
     </div>
   );

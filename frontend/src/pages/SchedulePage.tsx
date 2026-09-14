@@ -26,23 +26,22 @@ function parseWd(dateStr: string): number {
   return new Date(y, m - 1, d).getDay(); // 0=일 ~ 6=토
 }
 
-// 저장된 코드 -> 화면 표시(뱃지). 홀(F*)은 민트그린, 주방(B*)은 앰버,
-// 연차/사휴는 경고 빨강 계열로 통일 (memeal.zip 디자인 시스템).
+// 저장된 코드 -> 화면 표시(뱃지). 근무 코드마다 서로 다른 색 (memeal.zip 디자인 시스템).
 export const CELL: Record<string, { short: string; cls: string }> = {
-  FO: { short: "FO", cls: "bg-mint text-mint-ink" },
-  FC: { short: "FC", cls: "bg-mint text-mint-ink" },
-  BO: { short: "BO", cls: "bg-kitchen text-kitchen-ink" },
-  BM: { short: "BM", cls: "bg-kitchen text-kitchen-ink" },
-  BC: { short: "BC", cls: "bg-kitchen text-kitchen-ink" },
-  풀오마: { short: "풀", cls: "bg-[#F3E9D2] text-primary" },
-  사휴: { short: "사", cls: "bg-warn text-warn-ink" },
-  "D/O": { short: "휴", cls: "bg-gray-100 text-gray-400" },
-  연차: { short: "연", cls: "bg-warn text-warn-ink" },
+  FO: { short: "FO", cls: "bg-fo text-fo-ink" },
+  FC: { short: "FC", cls: "bg-fc text-fc-ink" },
+  BO: { short: "BO", cls: "bg-bo text-bo-ink" },
+  BM: { short: "BM", cls: "bg-bm text-bm-ink" },
+  BC: { short: "BC", cls: "bg-bc text-bc-ink" },
+  풀오마: { short: "풀", cls: "bg-full text-full-ink" },
+  사휴: { short: "사", cls: "bg-dayoff text-dayoff-ink" },
+  "D/O": { short: "휴", cls: "bg-off text-off-ink" },
+  연차: { short: "연", cls: "bg-leave text-leave-ink" },
   // 구버전 저장분 호환
-  O: { short: "O", cls: "bg-mint text-mint-ink" },
-  M: { short: "M", cls: "bg-kitchen text-kitchen-ink" },
-  C: { short: "C", cls: "bg-[#F3E9D2] text-primary" },
-  근무: { short: "근", cls: "bg-mint text-mint-ink" },
+  O: { short: "O", cls: "bg-fo text-fo-ink" },
+  M: { short: "M", cls: "bg-bm text-bm-ink" },
+  C: { short: "C", cls: "bg-fc text-fc-ink" },
+  근무: { short: "근", cls: "bg-fo text-fo-ink" },
 };
 
 const now = new Date();
@@ -513,32 +512,32 @@ function Legend() {
     <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
       <span className="font-medium text-gray-600">홀:</span>
       <span>
-        <span className={pill + " bg-mint text-mint-ink"}>FO</span> 홀오픈
+        <span className={pill + " bg-fo text-fo-ink"}>FO</span> 홀오픈
       </span>
       <span>
-        <span className={pill + " bg-mint text-mint-ink"}>FC</span> 홀마감
+        <span className={pill + " bg-fc text-fc-ink"}>FC</span> 홀마감
       </span>
       <span className="ml-2 font-medium text-gray-600">주방:</span>
       <span>
-        <span className={pill + " bg-kitchen text-kitchen-ink"}>BO</span> 주방오픈
+        <span className={pill + " bg-bo text-bo-ink"}>BO</span> 주방오픈
       </span>
       <span>
-        <span className={pill + " bg-kitchen text-kitchen-ink"}>BM</span> 주방미들
+        <span className={pill + " bg-bm text-bm-ink"}>BM</span> 주방미들
       </span>
       <span>
-        <span className={pill + " bg-kitchen text-kitchen-ink"}>BC</span> 주방마감
+        <span className={pill + " bg-bc text-bc-ink"}>BC</span> 주방마감
       </span>
       <span className="ml-2">
-        <span className={pill + " bg-[#F3E9D2] text-primary"}>풀</span> 풀오마
+        <span className={pill + " bg-full text-full-ink"}>풀</span> 풀오마
       </span>
       <span>
-        <span className={pill + " bg-gray-100 text-gray-400"}>휴</span> 휴무
+        <span className={pill + " bg-off text-off-ink"}>휴</span> 휴무
       </span>
       <span>
-        <span className={pill + " bg-warn text-warn-ink"}>연</span> 연차
+        <span className={pill + " bg-leave text-leave-ink"}>연</span> 연차
       </span>
       <span>
-        <span className={pill + " bg-warn text-warn-ink"}>사</span> 사전휴무
+        <span className={pill + " bg-dayoff text-dayoff-ink"}>사</span> 사전휴무
       </span>
     </div>
   );
@@ -619,10 +618,10 @@ function ShiftDistribution({ rows }: { rows: ScheduleRow[] }) {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-mint-ink">
+                  <td className="px-3 py-1.5 text-right text-fo-ink">
                     {r.summary.hall}
                   </td>
-                  <td className="px-3 py-1.5 text-right text-kitchen-ink">
+                  <td className="px-3 py-1.5 text-right text-bo-ink">
                     {r.summary.kitchen}
                   </td>
                   <td className="px-3 py-1.5 text-right">{r.summary.open}</td>
