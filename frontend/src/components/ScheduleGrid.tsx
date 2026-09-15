@@ -15,63 +15,32 @@ export interface GridRow {
   cells: Record<string, string>;
 }
 
+const LEGEND_ITEMS: { code: string; cls: string; label: string; time?: string }[] = [
+  { code: "FO", cls: "bg-fo text-fo-ink", label: "홀오픈", time: "10:45~20:45" },
+  { code: "FC", cls: "bg-fc text-fc-ink", label: "홀마감", time: "11:30~21:30" },
+  { code: "BO", cls: "bg-bo text-bo-ink", label: "주방오픈", time: "10:30~20:30" },
+  { code: "BM", cls: "bg-bm text-bm-ink", label: "주방미들", time: "11:00~21:00" },
+  { code: "BC", cls: "bg-bc text-bc-ink", label: "주방마감", time: "11:30~21:30" },
+  { code: "풀", cls: "bg-full text-full-ink", label: "풀오마 (하루 종일)" },
+  { code: "휴", cls: "bg-off text-off-ink", label: "휴무 (D/O)" },
+  { code: "연", cls: "bg-leave text-leave-ink", label: "연차" },
+  { code: "사", cls: "bg-dayoff text-dayoff-ink", label: "사전휴무" },
+];
+
 export function ScheduleLegend() {
   return (
     <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-      <span>
-        <span className="rounded-full bg-fo px-1.5 py-0.5 font-semibold text-fo-ink">
-          FO
-        </span>{" "}
-        홀오픈
-      </span>
-      <span>
-        <span className="rounded-full bg-fc px-1.5 py-0.5 font-semibold text-fc-ink">
-          FC
-        </span>{" "}
-        홀마감
-      </span>
-      <span>
-        <span className="rounded-full bg-bo px-1.5 py-0.5 font-semibold text-bo-ink">
-          BO
-        </span>{" "}
-        주방오픈
-      </span>
-      <span>
-        <span className="rounded-full bg-bm px-1.5 py-0.5 font-semibold text-bm-ink">
-          BM
-        </span>{" "}
-        주방미들
-      </span>
-      <span>
-        <span className="rounded-full bg-bc px-1.5 py-0.5 font-semibold text-bc-ink">
-          BC
-        </span>{" "}
-        주방마감
-      </span>
-      <span>
-        <span className="rounded-full bg-full px-1.5 py-0.5 font-semibold text-full-ink">
-          풀
-        </span>{" "}
-        풀오마
-      </span>
-      <span>
-        <span className="rounded-full bg-off px-1.5 py-0.5 font-semibold text-off-ink">
-          휴
-        </span>{" "}
-        휴무
-      </span>
-      <span>
-        <span className="rounded-full bg-leave px-1.5 py-0.5 font-semibold text-leave-ink">
-          연
-        </span>{" "}
-        연차
-      </span>
-      <span>
-        <span className="rounded-full bg-dayoff px-1.5 py-0.5 font-semibold text-dayoff-ink">
-          사
-        </span>{" "}
-        사전휴무
-      </span>
+      {LEGEND_ITEMS.map((item) => (
+        <span key={item.code}>
+          <span
+            className={"rounded-full px-1.5 py-0.5 font-semibold " + item.cls}
+          >
+            {item.code}
+          </span>{" "}
+          {item.label}
+          {item.time ? ` ${item.time}` : ""}
+        </span>
+      ))}
     </div>
   );
 }

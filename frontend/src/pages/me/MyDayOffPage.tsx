@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { createMyDayOff, getMe, listMyDayOff, type MeInfo, type MyRequest } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
-import { MAX_PER_MONTH } from "../../api/dayoff";
 import { fmtRange } from "../LeavePage";
 import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils/month";
 import MeNav from "./MeNav";
@@ -71,10 +70,6 @@ export default function MyDayOffPage() {
     <div>
       <MeNav current="사전 휴무 신청" />
       <h1 className="mb-1 text-xl font-bold">사전 휴무 신청</h1>
-      <p className="mb-4 text-sm text-gray-500">
-        연차와 다릅니다 — 그날 배치는 빠지지만 총 근무일수는 그대로예요 (연차
-        차감 없음). 한 달 최대 {MAX_PER_MONTH}일.
-      </p>
 
       {isPartTime ? (
         <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
