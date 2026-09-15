@@ -7,6 +7,7 @@
   POST  /api/schedule/{year}/{month}/share  -> "공유됨(confirmed)" 상태로 전환
 """
 
+import calendar
 import secrets
 from datetime import date
 
@@ -243,17 +244,22 @@ def _get_sched(session: Session, year: int, month: int) -> Schedule:
 
 
 def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
-    """저장된 ScheduleEntry 로부터 ScheduleResult 를 만든다 (요약은 셀에서 재계산)."""
+    """저장된 ScheduleEntry 로부터 ScheduleResult 를 만든다 (요약은 셀에서 재계산).
+
+    날짜 칸은 그 달 전체(1일~말일)로 만든다 — 엔트리가 하나도 없는(자동배치를
+    아직 안 돌린) 스케줄이어도 표가 비어 보이지 않고 빈 칸을 클릭해서 채울 수
+    있어야 하기 때문.
+    """
     entries = session.exec(
         select(ScheduleEntry).where(ScheduleEntry.schedule_id == sched.id)
     ).all()
     staff_rows = _load_active_staff(session)
     cells_by_staff: dict[int, dict[str, str]] = {s.id: {} for s in staff_rows}
-    day_set: set[str] = set()
     for e in entries:
-        day_str = e.work_date.isoformat()
-        day_set.add(day_str)
-        cells_by_staff.setdefault(e.staff_id, {})[day_str] = e.work_code
+        cells_by_staff.setdefault(e.staff_id, {})[e.work_date.isoformat()] = e.work_code
+
+    last_day = calendar.monthrange(sched.year, sched.month)[1]
+    days = [date(sched.year, sched.month, d).isoformat() for d in range(1, last_day + 1)]
 
     rows = [
         ScheduleStaffRow(
@@ -270,7 +276,7 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
     return ScheduleResult(
         year=sched.year,
         month=sched.month,
-        days=sorted(day_set),
+        days=days,
         rows=rows,
         warnings=[],
         feasible=True,
