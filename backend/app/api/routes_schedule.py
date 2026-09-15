@@ -104,6 +104,11 @@ def _load_requirements(session: Session) -> dict[int, dict[str, dict[str, int]]]
     return out
 
 
+def _load_daily_headcount_target(session: Session) -> int:
+    store = session.get(Store, DEFAULT_STORE_ID)
+    return store.daily_headcount_target if store else 0
+
+
 def _persist(
     session: Session, result_rows: dict[int, dict[str, str]], year: int, month: int
 ) -> Schedule:
@@ -180,6 +185,7 @@ def run_auto_schedule(
         leave_dates=_load_leave_dates(session),
         blocked_dates=_load_blocked_dates(session),
         requirements=_load_requirements(session),
+        daily_headcount_target=_load_daily_headcount_target(session),
     )
 
     solved = build_schedule(inp)

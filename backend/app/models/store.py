@@ -20,4 +20,8 @@ class Store(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
+    # 하루 총 출근 인원 목표 (요일 무관 동일). 0 = 설정 안 함(비활성).
+    # 포지션 x 시간대 "필요 인원"과 별개 — 파트타임이 하루 종일 근무하며
+    # 슬롯 여러 개를 혼자 채워도, 실제 출근 인원 수는 이 값을 목표로 함.
+    daily_headcount_target: int = 0
     created_at: datetime = Field(default_factory=utcnow)

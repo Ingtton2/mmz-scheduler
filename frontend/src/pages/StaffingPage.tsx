@@ -6,7 +6,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  getDailyHeadcountTarget,
   getStaffingRequirements,
+  putDailyHeadcountTarget,
   putStaffingRequirements,
   type StaffingItem,
 } from "../api/staffing";
@@ -52,10 +54,17 @@ export default function StaffingPage() {
   const [error, setError] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
 
+  const [headcountTarget, setHeadcountTarget] = useState("0");
+  const [savingHeadcount, setSavingHeadcount] = useState(false);
+  const [headcountSavedMsg, setHeadcountSavedMsg] = useState("");
+
   async function refresh() {
     setLoading(true);
     try {
-      const items = await getStaffingRequirements();
+      const [items, hc] = await Promise.all([
+        getStaffingRequirements(),
+        getDailyHeadcountTarget(),
+      ]);
       const g = emptyGrid();
       // 서버 값으로 덮어쓰기 (없는 칸은 0)
       for (const w of WEEKDAYS)
@@ -67,11 +76,26 @@ export default function StaffingPage() {
         if (col && g[it.weekday]) g[it.weekday][col.key] = String(it.min_headcount);
       }
       setGrid(g);
+      setHeadcountTarget(String(hc.daily_headcount_target));
       setError("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveHeadcountTarget() {
+    setSavingHeadcount(true);
+    try {
+      const v = await putDailyHeadcountTarget(num(headcountTarget));
+      setHeadcountTarget(String(v.daily_headcount_target));
+      setHeadcountSavedMsg("저장되었습니다.");
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingHeadcount(false);
     }
   }
 
@@ -132,6 +156,38 @@ export default function StaffingPage() {
         자동배치가 이 인원을 채우려 시도하고, 못 채우면 경고로 알려줍니다.
         (홀은 미들 시간대 없음)
       </p>
+
+      {/* 하루 총 출근 인원 목표 */}
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">하루 총 출근 인원 목표</span>
+          <span className="text-xs text-gray-500">
+            요일 무관 동일 값 (사장님·점장 포함). 파트타임이 하루 종일 근무해
+            자리를 여러 개 혼자 채워도, 실제 출근 인원 수는 이 값에 맞춥니다.
+            0이면 이 규칙을 끕니다.
+          </span>
+          <input
+            type="number"
+            min={0}
+            className={inp}
+            value={headcountTarget}
+            onChange={(e) => {
+              setHeadcountTarget(e.target.value);
+              setHeadcountSavedMsg("");
+            }}
+          />
+        </label>
+        <button
+          onClick={saveHeadcountTarget}
+          disabled={savingHeadcount || loading}
+          className="rounded bg-primary hover:bg-primary-dark px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {savingHeadcount ? "저장 중…" : "저장"}
+        </button>
+        {headcountSavedMsg && (
+          <span className="text-sm text-green-700">{headcountSavedMsg}</span>
+        )}
+      </div>
 
       {/* 기본값 일괄 적용 */}
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4">

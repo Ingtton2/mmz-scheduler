@@ -98,6 +98,10 @@ class SolveInput:
     blocked_dates: dict[int, set[date]] = field(default_factory=dict)
     # weekday -> {position -> {slot -> min_headcount}}
     requirements: dict[int, dict[str, dict[str, int]]] = field(default_factory=dict)
+    # 하루 총 출근 인원 목표 (요일 무관, 사장님·점장 포함). 0 = 비활성.
+    # 포지션x슬롯 필요인원과 별개 규칙 — 파트타임이 하루 종일 근무하며 슬롯을
+    # 여러 개 혼자 채워도, 실제 출근 "머릿수"는 이 값을 목표로 맞춘다 (소프트).
+    daily_headcount_target: int = 0
 
 
 @dataclass
@@ -265,6 +269,18 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 else:
                     m.Add(sh == 0)
 
+    # --- 하루 총 출근 인원 목표 (소프트) ---
+    #   포지션x슬롯 필요인원과 별개. 파트타임 하루 종일 근무가 슬롯 여러 개를
+    #   혼자 채워도 실제 출근 "머릿수"는 이 값을 목표로 한다 (사장님·점장 포함).
+    headcount_short: dict[int, cp_model.IntVar] = {}
+    if inp.daily_headcount_target > 0:
+        target_hc = inp.daily_headcount_target
+        for di in range(n_days):
+            total_work = sum(work[(s.id, di)] for s in staff)
+            hs = m.NewIntVar(0, target_hc, f"hcshort_{di}")
+            m.Add(total_work + hs >= target_hc)
+            headcount_short[di] = hs
+
     # --- 관리 책임자 최소 1인 출근 (하드) ---
     mgr_group = [s for s in staff if s.in_manager_group]
     mgr_all_off_days: list[str] = []
@@ -380,6 +396,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     #          사장주말 > 사장휴일균등 > 공정성 > 근무몰림 > 총근무
     W_OVERREST = 500_000   # 기준보다 더 쉬는 것(근무일수 미달) = 사실상 하드
     W_SHORT = 100_000
+    W_HEADCOUNT = 100_000  # 하루 총 출근 인원 목표 미달 (필요인원과 동급 우선순위)
     W_UNDERREST = 4_000    # 초과근무 (인원 부족 시 허용)
     W_STREAK = 1_000       # 6일 이상 연속 근무 (불가피하면 허용)
     W_OWNWKND = 250
@@ -391,6 +408,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     obj = (
         W_OVERREST * sum(over_rest.values())
         + W_SHORT * sum(shortage.values())
+        + W_HEADCOUNT * sum(headcount_short.values())
         + W_UNDERREST * sum(under_rest.values())
         + W_STREAK * sum(streak_viol)
         + W_OWNWKND * owner_weekend
@@ -491,6 +509,27 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                         )
                     )
 
+    # --- 경고: 하루 총 출근 인원 목표 미달 ---
+    total_hc_short = 0
+    for di, d in enumerate(days):
+        hs = headcount_short.get(di)
+        if hs is None:
+            continue
+        v = solver.Value(hs)
+        if v > 0:
+            total_hc_short += v
+            filled = inp.daily_headcount_target - v
+            result.warnings.append(
+                SolveWarning(
+                    d.isoformat(),
+                    "총원",
+                    inp.daily_headcount_target,
+                    filled,
+                    f"{d.isoformat()}: 총 출근 인원 {inp.daily_headcount_target}명 목표인데 "
+                    f"{filled}명만 배치 (−{v}) · 근무 가능한 사람이 부족합니다",
+                )
+            )
+
     # --- 경고: 정직원/점장 근무일수(기본휴무) 미달 = 기준보다 더 쉼 ---
     name_by_id = {s.id: s.name for s in staff}
     target_by_id = {s.id: s.min_days_off for s in staff}
@@ -554,6 +593,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
 
     result.feasible = (
         total_short == 0
+        and total_hc_short == 0
         and over_gap == 0
         and under_gap == 0
         and not mgr_all_off_days

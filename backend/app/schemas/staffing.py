@@ -22,3 +22,10 @@ class StaffingRequirementItem(BaseModel):
 
 class StaffingRequirementsPut(BaseModel):
     items: list[StaffingRequirementItem]
+
+
+class DailyHeadcountTarget(BaseModel):
+    """포지션x슬롯 필요인원과 별개로, 하루 총 출근 인원(사장님·점장 포함) 목표.
+    요일 무관 동일 값. 0 = 비활성."""
+
+    daily_headcount_target: int = Field(ge=0)

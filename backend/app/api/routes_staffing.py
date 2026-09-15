@@ -5,12 +5,16 @@
   PUT  /api/staffing-requirements   설정 전체 교체 (화면이 통째로 보냄)
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, delete, select
 
 from app.database import get_session
-from app.models import DEFAULT_STORE_ID, StaffingRequirement
-from app.schemas.staffing import StaffingRequirementItem, StaffingRequirementsPut
+from app.models import DEFAULT_STORE_ID, StaffingRequirement, Store
+from app.schemas.staffing import (
+    DailyHeadcountTarget,
+    StaffingRequirementItem,
+    StaffingRequirementsPut,
+)
 
 router = APIRouter(prefix="/staffing-requirements", tags=["staffing"])
 
@@ -67,3 +71,26 @@ def put_requirements(
         )
     session.commit()
     return get_requirements(session)
+
+
+@router.get("/daily-headcount-target", response_model=DailyHeadcountTarget)
+def get_daily_headcount_target(
+    session: Session = Depends(get_session),
+) -> DailyHeadcountTarget:
+    store = session.get(Store, DEFAULT_STORE_ID)
+    if store is None:
+        raise HTTPException(status_code=404, detail="매장 정보가 없습니다.")
+    return DailyHeadcountTarget(daily_headcount_target=store.daily_headcount_target)
+
+
+@router.put("/daily-headcount-target", response_model=DailyHeadcountTarget)
+def put_daily_headcount_target(
+    payload: DailyHeadcountTarget, session: Session = Depends(get_session)
+) -> DailyHeadcountTarget:
+    store = session.get(Store, DEFAULT_STORE_ID)
+    if store is None:
+        raise HTTPException(status_code=404, detail="매장 정보가 없습니다.")
+    store.daily_headcount_target = payload.daily_headcount_target
+    session.add(store)
+    session.commit()
+    return DailyHeadcountTarget(daily_headcount_target=store.daily_headcount_target)

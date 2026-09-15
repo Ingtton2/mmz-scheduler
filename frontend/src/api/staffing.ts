@@ -13,3 +13,17 @@ export const getStaffingRequirements = () =>
 
 export const putStaffingRequirements = (items: StaffingItem[]) =>
   apiSend<StaffingItem[]>("PUT", "/staffing-requirements", { items });
+
+export interface DailyHeadcountTarget {
+  daily_headcount_target: number;
+}
+
+export const getDailyHeadcountTarget = () =>
+  apiGet<DailyHeadcountTarget>("/staffing-requirements/daily-headcount-target");
+
+export const putDailyHeadcountTarget = (daily_headcount_target: number) =>
+  apiSend<DailyHeadcountTarget>(
+    "PUT",
+    "/staffing-requirements/daily-headcount-target",
+    { daily_headcount_target },
+  );

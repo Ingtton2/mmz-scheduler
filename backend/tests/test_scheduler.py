@@ -107,6 +107,50 @@ def test_part_time_gets_full_day_code():
     )
 
 
+def test_daily_headcount_target_adds_extra_body():
+    """포지션x슬롯 필요인원(6자리)이 파트타임 1명(홀 오픈+마감 동시 커버) 덕분에
+    실제로는 5명으로 채워지는 상황 -> 하루 총 출근 인원 목표를 6으로 걸면
+    여유 인력이 있을 때 6번째 사람을 추가로 배치해서 실제 머릿수를 맞춘다."""
+    weekend = frozenset({5, 6})
+    staff = [
+        StaffInput(1, "주1", "kitchen", work_weekdays=weekend, fixed=True),
+        StaffInput(2, "주2", "kitchen", work_weekdays=weekend, fixed=True),
+        StaffInput(3, "주3", "kitchen", work_weekdays=weekend, fixed=True),
+        StaffInput(4, "주4", "kitchen", work_weekdays=weekend, fixed=True),
+        StaffInput(5, "주5(여유)", "kitchen", work_weekdays=weekend),
+        StaffInput(
+            6, "홀알바", "hall", work_weekdays=weekend, fixed=True,
+            is_part_time=True,
+        ),
+    ]
+
+    def _weekend_totals(r):
+        totals = {}
+        for key in r.entries[1]:
+            if date.fromisoformat(key).weekday() < 5:
+                continue
+            totals[key] = sum(
+                1 for sid in (1, 2, 3, 4, 5, 6) if r.entries[sid][key] in WORK_CODES
+            )
+        return totals
+
+    r0 = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    totals0 = _weekend_totals(r0)
+    assert totals0 and all(t == 5 for t in totals0.values())
+
+    r6 = build_schedule(
+        SolveInput(2026, 9, staff, requirements=BASIC, daily_headcount_target=6)
+    )
+    totals6 = _weekend_totals(r6)
+    assert all(t == 6 for t in totals6.values())
+    # 주말엔 목표(6명)를 다 채웠으니 "총원" 경고가 없어야 함 (평일엔 직원이 아예
+    # 없어 경고가 뜨는 게 맞으므로 주말 날짜만 확인).
+    assert not any(
+        w.position == "총원" and date.fromisoformat(w.date).weekday() >= 5
+        for w in r6.warnings
+    )
+
+
 def test_owner_and_manager_always_close():
     staff = _base_team() + [
         StaffInput(10, "사장", "both", role="owner"),
