@@ -10,7 +10,7 @@
 //    다음 번 방문 때 반영 (stale-while-revalidate). Vite 가 빌드마다 파일명에
 //    해시를 붙이므로, 내용이 바뀌면 파일명도 바뀌어 예전 캐시와 절대 안 섞인다.
 //  - skipWaiting + clients.claim: 새 버전이 배포되면 탭을 안 닫아도 바로 활성화.
-const CACHE_NAME = "memealzip-v2";
+const CACHE_NAME = "memealzip-v3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

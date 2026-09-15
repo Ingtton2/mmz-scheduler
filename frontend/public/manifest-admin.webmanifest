@@ -1,7 +1,8 @@
 {
+  "id": "/admin-app",
   "name": "메밀집 스케줄 관리",
   "short_name": "메밀집 관리자",
-  "description": "메밀집 사장님용 근태관리 앱 — 직원 등록, 자동배치, QR 공유",
+  "description": "메밀집 사장님용 근태관리 앱 — 직원 등록, 자동배치, 스케줄 공개",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",
