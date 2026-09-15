@@ -127,7 +127,7 @@ export default function MyDayOffPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-[#B08968] hover:bg-[#997555] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {saving ? "신청 중…" : "사전 휴무 신청"}
           </button>

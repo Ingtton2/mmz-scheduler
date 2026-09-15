@@ -58,6 +58,35 @@ const isManualEditBlocked = (y: number, m: number) => ymValue(y, m) < CURRENT_YM
 
 const cellKey = (staffId: number, date: string) => `${staffId}|${date}`;
 
+// 일자별 통계(총근무/주방/홀 인원)용 코드 분류. FO/FC=홀, BO/BM/BC=주방, 풀오마=홀
+// (풀타임 홀 커버). O/C/M 은 구버전 저장분 호환.
+const HALL_CODES = new Set(["FO", "FC", "풀오마", "O", "C"]);
+const KITCHEN_CODES = new Set(["BO", "BM", "BC", "M"]);
+
+interface DayStat {
+  total: number;
+  hall: number;
+  kitchen: number;
+}
+
+function computeDayStats(
+  result: ScheduleResult,
+  edits: Record<string, string>,
+): Record<string, DayStat> {
+  const stats: Record<string, DayStat> = {};
+  for (const d of result.days) {
+    let hall = 0;
+    let kitchen = 0;
+    for (const row of result.rows) {
+      const code = edits[cellKey(row.staff_id, d)] ?? row.cells[d] ?? "";
+      if (HALL_CODES.has(code)) hall++;
+      else if (KITCHEN_CODES.has(code)) kitchen++;
+    }
+    stats[d] = { hall, kitchen, total: hall + kitchen };
+  }
+  return stats;
+}
+
 export default function SchedulePage() {
   const [year, setYear] = useState(NEXT_MONTH_YEAR);
   const [month, setMonth] = useState(NEXT_MONTH);
@@ -79,6 +108,7 @@ export default function SchedulePage() {
   const [downloading, setDownloading] = useState(false);
 
   const dirtyCount = Object.keys(edits).length;
+  const dayStats = result ? computeDayStats(result, edits) : {};
 
   function resetTransient() {
     setEdits({});
@@ -475,6 +505,38 @@ export default function SchedulePage() {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 bg-gray-50 font-medium">
+                  <td className="sticky left-0 z-10 bg-gray-50 px-3 py-1 whitespace-nowrap">
+                    총근무인원
+                  </td>
+                  {result.days.map((d) => (
+                    <td key={d} className="w-8 border-l px-0.5 py-1 text-center">
+                      {dayStats[d]?.total ?? 0}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="bg-gray-50 font-medium">
+                  <td className="sticky left-0 z-10 bg-gray-50 px-3 py-1 whitespace-nowrap">
+                    주방인원
+                  </td>
+                  {result.days.map((d) => (
+                    <td key={d} className="w-8 border-l px-0.5 py-1 text-center">
+                      {dayStats[d]?.kitchen ?? 0}
+                    </td>
+                  ))}
+                </tr>
+                <tr className="bg-gray-50 font-medium">
+                  <td className="sticky left-0 z-10 bg-gray-50 px-3 py-1 whitespace-nowrap">
+                    홀인원
+                  </td>
+                  {result.days.map((d) => (
+                    <td key={d} className="w-8 border-l px-0.5 py-1 text-center">
+                      {dayStats[d]?.hall ?? 0}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
             </table>
           </div>
           <p className="mt-2 text-xs text-gray-400">
