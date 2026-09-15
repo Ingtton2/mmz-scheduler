@@ -28,6 +28,7 @@ export interface Staff {
   work_weekdays: number[]; // 0=월 ~ 6=일
   fixed_schedule: boolean; // 근무 가능 요일에 항상 배치
   is_active: boolean;
+  hire_date: string | null; // "YYYY-MM-DD"
   created_at: string;
   leave: LeaveBalance | null; // 정직원만
 }
@@ -39,6 +40,7 @@ export interface StaffCreate {
   employment_type?: string | null;
   work_weekdays: number[];
   fixed_schedule: boolean;
+  hire_date?: string | null;
   leave: LeaveBalanceInput;
 }
 
@@ -49,6 +51,7 @@ export interface StaffUpdate {
   employment_type?: string | null;
   work_weekdays?: number[];
   fixed_schedule?: boolean;
+  hire_date?: string | null;
 }
 
 export const listStaff = () => apiGet<Staff[]>("/staff");

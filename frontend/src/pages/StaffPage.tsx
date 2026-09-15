@@ -50,6 +50,7 @@ const EMPTY_FORM = {
   employment_type: "full_time",
   work_weekdays: [0, 1, 2, 3, 4, 5, 6] as number[],
   fixed_schedule: false,
+  hire_date: "",
   leave: { ...EMPTY_LEAVE },
 };
 
@@ -126,6 +127,7 @@ export default function StaffPage() {
           employment_type: isOwner ? null : form.employment_type,
           work_weekdays: form.work_weekdays,
           fixed_schedule: form.fixed_schedule,
+          hire_date: form.hire_date || null,
         });
         if (showLeave) {
           await updateLeaveBalance(editingStaffId, toInput(form.leave));
@@ -139,6 +141,7 @@ export default function StaffPage() {
           employment_type: isOwner ? null : form.employment_type,
           work_weekdays: form.work_weekdays,
           fixed_schedule: form.fixed_schedule,
+          hire_date: form.hire_date || null,
           leave: toInput(form.leave),
         });
       }
@@ -163,6 +166,7 @@ export default function StaffPage() {
       employment_type: s.employment_type ?? "full_time",
       work_weekdays: s.work_weekdays,
       fixed_schedule: s.fixed_schedule,
+      hire_date: s.hire_date ?? "",
       leave: s.leave
         ? {
             base_off_days: String(s.leave.base_off_days),
@@ -313,6 +317,16 @@ export default function StaffPage() {
               </select>
             </label>
           )}
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">입사일</span>
+            <input
+              type="date"
+              className={field}
+              value={form.hire_date}
+              onChange={(e) => setForm({ ...form, hire_date: e.target.value })}
+            />
+          </label>
         </div>
 
         {/* --- 근무 가능 요일 --- */}
@@ -445,6 +459,7 @@ export default function StaffPage() {
               <th className="px-3 py-2">포지션</th>
               <th className="px-3 py-2">고용형태</th>
               <th className="px-3 py-2">근무 요일</th>
+              <th className="px-3 py-2">입사일</th>
               <th className="px-3 py-2 text-right">월휴일</th>
               <th className="px-3 py-2 text-right">합연차</th>
               <th className="px-3 py-2 text-right">사용</th>
@@ -455,13 +470,13 @@ export default function StaffPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={11} className="px-3 py-6 text-center text-gray-400">
                   불러오는 중…
                 </td>
               </tr>
             ) : staff.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={11} className="px-3 py-6 text-center text-gray-400">
                   아직 등록된 직원이 없습니다.
                 </td>
               </tr>
@@ -566,6 +581,9 @@ function FragmentRow({
             </button>
           )}
         </td>
+        <td className="px-3 py-2">
+          {s.hire_date ?? <span className="text-gray-300">—</span>}
+        </td>
 
         <td className="px-3 py-2 text-right">
           {s.leave ? s.leave.base_off_days : <span className="text-gray-300">—</span>}
@@ -627,7 +645,7 @@ function FragmentRow({
 
       {editing && s.leave && (
         <tr className="border-b bg-amber-50 last:border-0">
-          <td colSpan={10} className="px-3 py-3">
+          <td colSpan={11} className="px-3 py-3">
             <div className="flex flex-wrap items-end gap-4">
               <span className="text-sm font-medium text-gray-700">
                 {s.name} 연차 수정

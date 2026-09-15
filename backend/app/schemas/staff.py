@@ -12,7 +12,7 @@
   - 근무 가능 요일(work_weekdays): 0=월 ~ 6=일. 기본 전체. 파트타임 요일 고정용.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -36,6 +36,7 @@ class StaffCreate(BaseModel):
     employment_type: EmploymentType | None = None
     work_weekdays: list[int] = ALL_WEEKDAYS
     fixed_schedule: bool = False
+    hire_date: date | None = None
     # 연차 숫자 (정직원만 실제로 저장됨)
     leave: LeaveBalanceInput = LeaveBalanceInput()
 
@@ -62,6 +63,7 @@ class StaffUpdate(BaseModel):
     employment_type: EmploymentType | None = None
     work_weekdays: list[int] | None = None
     fixed_schedule: bool | None = None
+    hire_date: date | None = None
 
     @field_validator("work_weekdays")
     @classmethod
@@ -79,6 +81,7 @@ class StaffRead(BaseModel):
     work_weekdays: list[int]
     fixed_schedule: bool
     is_active: bool
+    hire_date: date | None
     created_at: datetime
     leave: LeaveBalanceRead | None  # 정직원만 값이 있음
 

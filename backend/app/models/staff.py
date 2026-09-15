@@ -5,7 +5,7 @@ enum 값들은 문자열로 저장됩니다 (예: position = "both").
 검증은 API 스키마(app/schemas/staff.py)에서 합니다.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -32,4 +32,5 @@ class Staff(SQLModel, table=True):
 
     is_active: bool = True         # 퇴사 시 False (기록은 남김)
     sort_order: int = 0            # 스케줄 표에서 보여줄 순서 (작을수록 위). 사장님은 항상 맨 아래.
+    hire_date: date | None = None  # 입사일 (YYYY-MM-DD). 사장님이 직접 입력/수정.
     created_at: datetime = Field(default_factory=utcnow)

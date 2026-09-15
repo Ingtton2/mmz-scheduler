@@ -187,3 +187,32 @@ def test_delete_preserves_leave_and_dayoff_history(client: TestClient):
     dayoff_names = [r["staff_name"] for r in client.get("/api/dayoff-requests").json()]
     assert "이력보존직원" in leave_names
     assert "이력보존직원" in dayoff_names
+
+
+def test_hire_date_set_on_create_and_editable(client: TestClient):
+    sid = client.post(
+        "/api/staff",
+        json={
+            "name": "입사일직원",
+            "employment_type": "full_time",
+            "position": "hall",
+            "role": "staff",
+            "hire_date": "2024-03-02",
+        },
+    ).json()["id"]
+
+    listed = client.get("/api/staff").json()
+    row = next(s for s in listed if s["id"] == sid)
+    assert row["hire_date"] == "2024-03-02"
+
+    updated = client.patch(f"/api/staff/{sid}", json={"hire_date": "2025-01-15"})
+    assert updated.status_code == 200
+    assert updated.json()["hire_date"] == "2025-01-15"
+
+
+def test_hire_date_defaults_to_null(client: TestClient):
+    created = client.post(
+        "/api/staff",
+        json={"name": "입사일없음", "employment_type": "part_time", "position": "kitchen", "role": "staff"},
+    ).json()
+    assert created["hire_date"] is None

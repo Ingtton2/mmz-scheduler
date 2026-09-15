@@ -65,6 +65,8 @@ def _ensure_staff_columns() -> None:
             }
         if "sort_order" not in cols:
             conn.execute(text("ALTER TABLE staff ADD COLUMN sort_order INTEGER DEFAULT 0"))
+        if "hire_date" not in cols:
+            conn.execute(text("ALTER TABLE staff ADD COLUMN hire_date DATE"))
 
 
 def init_db() -> None:
