@@ -100,3 +100,13 @@ body {
     border-color: var(--color-card);
   }
 }
+
+/*
+  iOS 자동 확대 방지: 입력창 글자가 16px 미만이면 탭할 때 화면이 확대된다.
+  레이어 밖(unlayered) CSS라 Tailwind 유틸리티(text-sm 등)보다 항상 우선한다.
+*/
+input,
+select,
+textarea {
+  font-size: 16px;
+}
