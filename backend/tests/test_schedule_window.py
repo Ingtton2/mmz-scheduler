@@ -11,7 +11,6 @@
 from datetime import date
 
 import app.api.routes_me as routes_me
-import app.api.routes_public as routes_public
 import app.api.routes_schedule as routes_schedule
 import pytest
 from fastapi.testclient import TestClient
@@ -27,7 +26,6 @@ TODAY = date(2026, 9, 10)
 def _fixed_today(monkeypatch):
     monkeypatch.setattr(routes_schedule, "_today", lambda: TODAY)
     monkeypatch.setattr(routes_me, "_today", lambda: TODAY)
-    monkeypatch.setattr(routes_public, "_today", lambda: TODAY)
 
 
 def _mk_staff(client: TestClient, name: str) -> int:
@@ -170,16 +168,14 @@ def test_employee_cannot_see_two_months_ahead_even_if_shared(client: TestClient)
     assert auto.status_code == 200
     share = client.post("/api/schedule/2026/11/share")
     assert share.status_code == 200
-    share_code = share.json()["share_code"]
 
     # 관리자 화면 기준으로는 분명히 confirmed 상태.
     admin_view = client.get("/api/schedule", params={"year": 2026, "month": 11})
     assert admin_view.json()["status"] == "confirmed"
 
-    # 그런데도 직원 쪽(로그인/QR/전체조회) 은 전부 차단되어야 한다.
+    # 그런데도 직원 쪽(로그인 후 본인/전체 조회) 은 전부 차단되어야 한다.
     assert client.get("/api/me/schedule/2026/11", headers=headers).status_code == 404
     assert client.get("/api/me/team-schedule/2026/11", headers=headers).status_code == 404
-    assert client.get(f"/api/public/schedule/{share_code}").status_code == 404
 
 
 def test_employee_can_see_next_month_only_when_shared(client: TestClient):

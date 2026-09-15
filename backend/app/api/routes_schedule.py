@@ -4,19 +4,15 @@
   POST  /api/schedule/auto              { year, month }  -> 자동배치 + 저장 + 결과
   GET   /api/schedule?year=&month=      -> 저장된 스케줄 (없으면 404)
   PATCH /api/schedule/entries           { year, month, changes[] } -> 셀 수동 수정
-  POST  /api/schedule/{year}/{month}/share  -> 공유 URL/QR 발급
-  GET   /api/schedule/share/{code}/qr   -> QR PNG
+  POST  /api/schedule/{year}/{month}/share  -> "공유됨(confirmed)" 상태로 전환
 """
 
-import io
 import secrets
 from datetime import date
 
-import qrcode
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, delete, select
 
-from app.config import settings
 from app.database import get_session
 from app.models import (
     DEFAULT_STORE_ID,
@@ -336,34 +332,15 @@ def edit_entries(
 def share_schedule(
     year: int, month: int, session: Session = Depends(get_session)
 ) -> ShareResult:
-    """스케줄을 "공유됨(confirmed)" 상태로 바꾸고 URL/QR 경로를 돌려준다 (스펙 7).
+    """스케줄을 "공유됨(confirmed)" 상태로 바꾼다 — 로그인한 직원에게 노출.
 
-    공유코드는 처음 한 번만 새로 발급하고, 그 뒤로는 재사용한다 — 이미 나눠준
-    QR/링크가 그대로 최신 버전을 가리키게 하기 위함. 상태 전환(draft->confirmed)
-    은 재공유 때도 매번 일어나야 한다 (수정 후 재공유 흐름)."""
+    공유코드는 스케줄을 고유하게 식별해두기 위해 처음 한 번만 발급하고 그 뒤로는
+    재사용한다. 상태 전환(draft->confirmed)은 재공유 때도 매번 일어나야 한다
+    (수정 후 재공유 흐름)."""
     sched = _get_sched(session, year, month)
     if not sched.share_code:
         sched.share_code = secrets.token_urlsafe(9)
     sched.status = "confirmed"
     session.add(sched)
     session.commit()
-    base = settings.public_base_url.rstrip("/")
-    return ShareResult(
-        share_code=sched.share_code,
-        url=f"{base}/schedule/{sched.share_code}",
-        qr_path=f"/api/schedule/share/{sched.share_code}/qr",
-    )
-
-
-@router.get("/share/{code}/qr")
-def share_qr(code: str, session: Session = Depends(get_session)) -> Response:
-    sched = session.exec(
-        select(Schedule).where(Schedule.share_code == code)
-    ).first()
-    if sched is None:
-        raise HTTPException(status_code=404, detail="공유 코드를 찾을 수 없습니다.")
-    base = settings.public_base_url.rstrip("/")
-    img = qrcode.make(f"{base}/schedule/{code}")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return Response(content=buf.getvalue(), media_type="image/png")
+    return ShareResult(share_code=sched.share_code)

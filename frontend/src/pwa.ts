@@ -11,12 +11,10 @@ const ADMIN_MANIFEST = "/manifest-admin.webmanifest";
 const STAFF_MANIFEST = "/manifest-staff.webmanifest";
 const ADMIN_ICON = "/icons/admin-180.png";
 const STAFF_ICON = "/icons/staff-180.png";
-const DEFAULT_ICON = "/logo.png";
 
-type Persona = "admin" | "staff" | "public";
+type Persona = "admin" | "staff";
 
 function classify(pathname: string): Persona {
-  if (pathname.startsWith("/schedule/")) return "public"; // QR 공유 조회 — 설치 대상 아님
   if (pathname === "/join" || pathname === "/staff-login" || pathname.startsWith("/me")) {
     return "staff";
   }
@@ -36,16 +34,12 @@ function setOrRemoveLink(rel: string, href: string | null) {
 }
 
 export function syncPwaIdentity(pathname: string) {
-  const persona = classify(pathname);
-  if (persona === "admin") {
-    setOrRemoveLink("manifest", ADMIN_MANIFEST);
-    setOrRemoveLink("apple-touch-icon", ADMIN_ICON);
-  } else if (persona === "staff") {
+  if (classify(pathname) === "staff") {
     setOrRemoveLink("manifest", STAFF_MANIFEST);
     setOrRemoveLink("apple-touch-icon", STAFF_ICON);
   } else {
-    setOrRemoveLink("manifest", null);
-    setOrRemoveLink("apple-touch-icon", DEFAULT_ICON);
+    setOrRemoveLink("manifest", ADMIN_MANIFEST);
+    setOrRemoveLink("apple-touch-icon", ADMIN_ICON);
   }
 }
 

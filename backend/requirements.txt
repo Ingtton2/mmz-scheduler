@@ -14,9 +14,6 @@ psycopg[binary]>=3.2         # PostgreSQL 드라이버 (배포 환경). 로컬 S
 # --- 자동배치 엔진 (스펙 권장) ---
 ortools>=9.11                 # Google OR-Tools, 제약 최적화 솔버(CP-SAT)
 
-# --- QR 코드 ---
-qrcode[pil]>=7.4              # 공유 URL -> QR 이미지
-
 # --- 개발/테스트용 ---
 pytest>=8.3
 httpx>=0.27                   # 테스트에서 서버에 가짜 요청 보내기

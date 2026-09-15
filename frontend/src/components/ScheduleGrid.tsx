@@ -1,5 +1,5 @@
-// 근무표 그리드 + 범례 — 직원 QR 조회 화면(PublicSchedule)과 로그인한 직원의
-// "이번 달 전체 스케줄"(MyTeamSchedulePage) 이 똑같은 모양이라 공용으로 뺐다.
+// 근무표 그리드 + 범례 — 로그인한 직원의 "이번 달 전체 스케줄"
+// (MyTeamSchedulePage) 화면에서 쓰는 공용 컴포넌트.
 import { CELL } from "../pages/SchedulePage";
 
 const WD_CHAR = ["일", "월", "화", "수", "목", "금", "토"];

@@ -7,7 +7,7 @@ const MENU = [
   { key: "leave", label: "연차 신청 관리", to: "/admin/leave" },
   { key: "dayoff", label: "사전 휴무 신청 관리", to: "/admin/dayoff" },
   { key: "staffing", label: "필요 인원 설정 (포지션×시간대)", to: "/admin/staffing" },
-  { key: "schedule", label: "자동배치 · 수동 수정 · QR 공유", to: "/admin/schedule" },
+  { key: "schedule", label: "자동배치 · 수동 수정 · 직원 공개", to: "/admin/schedule" },
   { key: "accounts", label: "직원 계정 승인/PIN 관리", to: "/admin/accounts" },
   { key: "work-codes", label: "근무 코드 설정", step: "다음 단계" },
 ];

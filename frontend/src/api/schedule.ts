@@ -1,5 +1,5 @@
 // 자동배치 서버 통신 (스펙 5).
-import { API_BASE, ApiError, apiGet, apiSend } from "./client";
+import { ApiError, apiGet, apiSend } from "./client";
 
 export interface ScheduleWarning {
   date: string;
@@ -55,8 +55,6 @@ export interface ScheduleEdit {
 
 export interface ShareResult {
   share_code: string;
-  url: string;
-  qr_path: string;
 }
 
 // 수동 수정에서 고를 수 있는 코드
@@ -84,10 +82,6 @@ export const editScheduleEntries = (
 
 export const shareSchedule = (year: number, month: number) =>
   apiSend<ShareResult>("POST", `/schedule/${year}/${month}/share`);
-
-// QR PNG 는 <img src> 로 직접 부른다 (프록시/rewrite 로 백엔드에 전달됨)
-export const qrImageUrl = (shareCode: string) =>
-  `${API_BASE}/schedule/share/${shareCode}/qr`;
 
 // 저장된 스케줄. 없으면 404 -> null
 export async function getSavedSchedule(

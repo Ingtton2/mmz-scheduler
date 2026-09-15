@@ -87,8 +87,6 @@ class ManualEditRequest(BaseModel):
 
 class ShareResult(BaseModel):
     share_code: str
-    url: str        # 직원에게 공유할 전체 URL
-    qr_path: str    # QR PNG 를 받을 API 경로
 
 
 class PublicRow(BaseModel):

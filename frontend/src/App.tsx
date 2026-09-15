@@ -16,7 +16,6 @@ import DayOffPage from "./pages/DayOffPage";
 import StaffingPage from "./pages/StaffingPage";
 import SchedulePage from "./pages/SchedulePage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
-import PublicSchedule from "./pages/PublicSchedule";
 import LoginPage from "./pages/LoginPage";
 import JoinPage from "./pages/JoinPage";
 import StaffLoginPage from "./pages/StaffLoginPage";
@@ -153,9 +152,6 @@ export default function App() {
               </RequireAuth>
             }
           />
-
-          {/* 직원 조회 전용 — QR 로 접속. 로그인 없음 — 스펙 6.2 */}
-          <Route path="/schedule/:shareCode" element={<PublicSchedule />} />
 
           {/* 직원 셀프서비스 — 스펙 9 */}
           <Route path="/join" element={<JoinPage />} />

@@ -1,7 +1,7 @@
 // 자동배치 + 수동 수정 + 공유 화면 (스펙 5, 6.1, 7).
 //  - "자동배치 실행" -> OR-Tools 엔진이 근무표 계산·저장·표시
 //  - 표의 셀을 클릭해서 근무 코드를 바꾸고 "수정 저장" -> 반영
-//  - "공유" -> 고유 URL + QR 발급 (직원은 QR 스캔으로 로그인 없이 그 달 표를 봄)
+//  - "직원에게 공개" -> 상태를 "confirmed"로 바꿔 로그인한 직원이 조회 가능해짐
 //  - 근무 코드: 홀 FO/FC · 주방 BO/BM/BC · 파트타임 풀오마
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,12 +10,10 @@ import {
   EDIT_CODES,
   editScheduleEntries,
   getSavedSchedule,
-  qrImageUrl,
   runAutoSchedule,
   shareSchedule,
   type ScheduleResult,
   type ScheduleRow,
-  type ShareResult,
 } from "../api/schedule";
 import { LABEL } from "../labels";
 
@@ -73,10 +71,8 @@ export default function SchedulePage() {
   const [editingCell, setEditingCell] = useState<string | null>(null);
   const [savingEdits, setSavingEdits] = useState(false);
 
-  // 공유
-  const [share, setShare] = useState<ShareResult | null>(null);
+  // 공유 (직원에게 공개)
   const [sharing, setSharing] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   // 이미지 다운로드 (확정된 스케줄만)
   const gridRef = useRef<HTMLDivElement>(null);
@@ -87,8 +83,6 @@ export default function SchedulePage() {
   function resetTransient() {
     setEdits({});
     setEditingCell(null);
-    setShare(null);
-    setCopied(false);
   }
 
   async function loadSaved(y: number, m: number) {
@@ -161,8 +155,7 @@ export default function SchedulePage() {
   async function handleShare() {
     setSharing(true);
     try {
-      setShare(await shareSchedule(year, month));
-      setCopied(false);
+      await shareSchedule(year, month);
       setError("");
       // 서버가 상태를 "confirmed" 로 바꿨으므로 화면에도 바로 반영 (재조회 없이).
       setResult((r) => (r ? { ...r, status: "confirmed" } : r));
@@ -210,7 +203,8 @@ export default function SchedulePage() {
       <h1 className="mb-1 text-xl font-bold">자동배치 · 수정 · 공유</h1>
       <p className="mb-4 text-sm text-gray-500">
         “자동배치 실행”으로 근무표를 만들고, 표의 칸을 클릭해 직접 고칠 수
-        있습니다. 완성되면 “공유”로 QR을 만들어 직원에게 전달하세요.
+        있습니다. 완성되면 “직원에게 공개”를 눌러주세요 — 직원이 이름+PIN으로
+        로그인해서 바로 확인할 수 있어요.
       </p>
 
       {/* 컨트롤 */}
@@ -262,7 +256,7 @@ export default function SchedulePage() {
             title={dirtyCount > 0 ? "먼저 수정을 저장하세요" : ""}
             className="rounded border border-gray-300 px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
-            {sharing ? "생성 중…" : "공유 (QR)"}
+            {sharing ? "공개 중…" : "직원에게 공개"}
           </button>
         )}
         {result?.saved && result.status === "confirmed" && (
@@ -312,51 +306,6 @@ export default function SchedulePage() {
         <p className="mb-4 text-sm text-red-600">
           이전 달 스케줄은 더 이상 수정할 수 없습니다.
         </p>
-      )}
-
-      {/* 공유 패널 */}
-      {share && (
-        <div className="mb-4 flex flex-wrap items-center gap-4 rounded-lg border bg-white p-4">
-          <img
-            src={qrImageUrl(share.share_code)}
-            alt="스케줄 QR"
-            className="h-36 w-36 rounded border"
-          />
-          <div className="flex-1 text-sm">
-            <div className="mb-1 font-medium">직원 공유용 링크</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                readOnly
-                value={share.url}
-                onFocus={(e) => e.currentTarget.select()}
-                className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 text-xs"
-              />
-              <button
-                onClick={() => {
-                  navigator.clipboard?.writeText(share.url);
-                  setCopied(true);
-                }}
-                className="rounded border px-2 py-1 text-xs"
-              >
-                {copied ? "복사됨" : "복사"}
-              </button>
-              <a
-                href={`/schedule/${share.share_code}`}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
-              >
-                미리보기 ↗
-              </a>
-            </div>
-            <p className="mt-2 text-xs text-gray-400">
-              QR을 인쇄하거나 카톡으로 보내면, 직원은 로그인 없이 이 달 근무표를
-              봅니다. 링크 주소는 계속 같지만, 공유 뒤에 스케줄을 또 수정하면
-              다시 “임시” 상태로 바뀌어 직원 화면에서 안 보여요 — 수정을 끝내고
-              “공유” 버튼을 다시 눌러야 최신 내용이 반영됩니다.
-            </p>
-          </div>
-        </div>
       )}
 
       {error && (

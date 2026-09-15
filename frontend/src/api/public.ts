@@ -1,5 +1,6 @@
-// 직원 조회 전용 (로그인 없음, 스펙 6.2).
-import { apiGet } from "./client";
+// 직원 전체 스케줄 조회에 쓰는 공용 타입 (로그인 후, api/me.ts 의
+// getMyTeamSchedule 응답 모양). 백엔드 schedule_view.build_public_view() 가
+// 조립하는 모양과 대응된다.
 
 export interface PublicRow {
   staff_name: string;
@@ -16,6 +17,3 @@ export interface PublicScheduleResult {
   rows: PublicRow[];
   generated_at: string | null;
 }
-
-export const getPublicSchedule = (shareCode: string) =>
-  apiGet<PublicScheduleResult>(`/public/schedule/${shareCode}`);

@@ -1,4 +1,4 @@
-// 내 스케줄 조회 (스펙 9-4). 본인 칸만 보여준다 — 팀 전체 표는 QR 공유 화면(/schedule/:code)에서.
+// 내 스케줄 조회 (스펙 9-4). 본인 칸만 보여준다 — 팀 전체 표는 "전체 스케줄" 메뉴(MyTeamSchedulePage)에서.
 import { useEffect, useState } from "react";
 import { getMySchedule, type MyScheduleResult } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
