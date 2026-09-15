@@ -22,6 +22,17 @@ export default function StaffLoginPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // iOS Safari 는 화면을 아래로 당겨 튕기는 오버스크롤 때 body 배경색이 드러난다
+  // (position: fixed 요소로는 못 가림) — 이 화면에 있는 동안 body 배경을 페이지
+  // 배경과 맞춰서 그 순간에도 이어지게 한다.
+  useEffect(() => {
+    const prevBg = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = "#F9F3E7";
+    return () => {
+      document.body.style.backgroundColor = prevBg;
+    };
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -47,9 +58,9 @@ export default function StaffLoginPage() {
     "w-full rounded-[10px] border border-gray-400 px-3 py-2 text-sm";
 
   return (
-    <div className="relative">
-      <div className="fixed inset-0 -z-10 bg-[#F9F3E7]" />
-      <div className="flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center gap-6 px-4">
+    <div>
+      <div className="fixed inset-0 bg-[#F9F3E7]" />
+      <div className="relative z-10 flex min-h-[calc(100dvh-2rem)] flex-col items-center justify-center gap-6 px-4">
         <img
           src={logo}
           alt="memeal.zip"
