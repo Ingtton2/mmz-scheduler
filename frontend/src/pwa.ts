@@ -11,6 +11,8 @@ const ADMIN_MANIFEST = "/manifest-admin.webmanifest";
 const STAFF_MANIFEST = "/manifest-staff.webmanifest";
 const ADMIN_ICON = "/icons/admin-180.png";
 const STAFF_ICON = "/icons/staff-180.png";
+const ADMIN_THEME_COLOR = "#9C6B23";
+const STAFF_THEME_COLOR = "#B08968";
 
 type Persona = "admin" | "staff";
 
@@ -34,12 +36,15 @@ function setOrRemoveLink(rel: string, href: string | null) {
 }
 
 export function syncPwaIdentity(pathname: string) {
+  const themeColorEl = document.head.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (classify(pathname) === "staff") {
     setOrRemoveLink("manifest", STAFF_MANIFEST);
     setOrRemoveLink("apple-touch-icon", STAFF_ICON);
+    if (themeColorEl) themeColorEl.content = STAFF_THEME_COLOR;
   } else {
     setOrRemoveLink("manifest", ADMIN_MANIFEST);
     setOrRemoveLink("apple-touch-icon", ADMIN_ICON);
+    if (themeColorEl) themeColorEl.content = ADMIN_THEME_COLOR;
   }
 }
 
