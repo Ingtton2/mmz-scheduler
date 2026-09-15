@@ -55,7 +55,7 @@ def _load_active_staff(session: Session) -> list[Staff]:
         session.exec(
             select(Staff)
             .where(Staff.store_id == DEFAULT_STORE_ID, Staff.is_active == True)  # noqa: E712
-            .order_by(Staff.role.desc(), Staff.created_at)  # 사장님을 위로
+            .order_by(Staff.role == "owner", Staff.sort_order, Staff.created_at)  # 사장님을 아래로
         ).all()
     )
 

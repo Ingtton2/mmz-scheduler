@@ -31,4 +31,5 @@ class Staff(SQLModel, table=True):
     fixed_schedule: bool = False
 
     is_active: bool = True         # 퇴사 시 False (기록은 남김)
+    sort_order: int = 0            # 스케줄 표에서 보여줄 순서 (작을수록 위). 사장님은 항상 맨 아래.
     created_at: datetime = Field(default_factory=utcnow)

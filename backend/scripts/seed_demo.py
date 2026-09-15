@@ -39,18 +39,19 @@ from app.models import (  # noqa: E402
 
 ALL_WEEKDAYS = "0,1,2,3,4,5,6"
 
-# (이름, 포지션, 역할, 고용형태, 근무요일, 고정여부, 기본휴무)
+# (이름, 포지션, 역할, 고용형태, 근무요일, 고정여부, 기본휴무, 표시순서)
+# 표시순서: 스케줄 표에서의 줄 순서 (작을수록 위). 사장(owner)은 항상 맨 아래로 따로 묶인다.
 ROSTER = [
-    ("이태희", "both", "owner", None, ALL_WEEKDAYS, False, 0),
-    ("박재영", "both", "owner", None, ALL_WEEKDAYS, False, 0),
-    ("신주민", "both", "manager", "full_time", ALL_WEEKDAYS, False, 8),
-    ("정지원", "hall", "staff", "part_time", "5,6", True, 0),
-    ("김시윤", "hall", "staff", "full_time", ALL_WEEKDAYS, False, 8),
-    ("윤재훈", "both", "staff", "full_time", ALL_WEEKDAYS, False, 8),
-    ("권현석", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8),
-    ("이도경", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8),
-    ("윤용상", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8),
-    ("이희명", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8),
+    ("신주민", "both", "manager", "full_time", ALL_WEEKDAYS, False, 8, 1),
+    ("권현석", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8, 2),
+    ("윤재훈", "both", "staff", "full_time", ALL_WEEKDAYS, False, 8, 3),
+    ("이희명", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8, 4),
+    ("김시윤", "hall", "staff", "full_time", ALL_WEEKDAYS, False, 8, 5),
+    ("이도경", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8, 6),
+    ("윤용상", "kitchen", "staff", "full_time", ALL_WEEKDAYS, False, 8, 7),
+    ("정지원", "hall", "staff", "part_time", "5,6", True, 0, 8),
+    ("이태희", "both", "owner", None, ALL_WEEKDAYS, False, 0, 1),
+    ("박재영", "both", "owner", None, ALL_WEEKDAYS, False, 0, 2),
 ]
 
 # 포지션 -> {슬롯: 최소인원}  (홀은 미들 없음)
@@ -83,7 +84,7 @@ def main() -> None:
         s.commit()
 
         # 2) 직원 넣기
-        for name, pos, role, emp, wd, fixed, off in ROSTER:
+        for name, pos, role, emp, wd, fixed, off, order in ROSTER:
             staff = Staff(
                 store_id=DEFAULT_STORE_ID,
                 name=name,
@@ -92,6 +93,7 @@ def main() -> None:
                 employment_type=emp,
                 work_weekdays=wd,
                 fixed_schedule=fixed,
+                sort_order=order,
             )
             s.add(staff)
             s.commit()

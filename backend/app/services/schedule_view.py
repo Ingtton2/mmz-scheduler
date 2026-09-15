@@ -24,7 +24,7 @@ def build_public_view(session: Session, sched: Schedule) -> PublicScheduleResult
     staff_rows = session.exec(
         select(Staff)
         .where(Staff.store_id == sched.store_id, Staff.is_active == True)  # noqa: E712
-        .order_by(Staff.role.desc(), Staff.created_at)
+        .order_by(Staff.role == "owner", Staff.sort_order, Staff.created_at)
     ).all()
 
     cells_by_staff: dict[int, dict[str, str]] = {s.id: {} for s in staff_rows}
