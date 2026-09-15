@@ -240,7 +240,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         m.Add(y >= a + b - 1)
         return y
 
-    # --- 필요 인원 (포지션 x 슬롯) 커버 + 부족분 슬랙 ---
+    # --- 필요 인원 (포지션 x 슬롯) 커버 + 부족분 슬랙 (하한) ---
     shortage: dict[tuple[int, str, str], cp_model.IntVar] = {}
     for di, d in enumerate(days):
         wd = d.weekday()
@@ -250,7 +250,9 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 terms = []
                 for s in staff:
                     if s.is_part_time:
-                        terms.append(in_pos(s, di, pos))            # 풀오마: 모든 슬롯 커버
+                        if pos == "hall" and slot == "mid":
+                            continue                                 # 홀은 미들 없음
+                        terms.append(in_pos(s, di, pos))            # 풀오마: 그 포지션 모든 슬롯 커버
                     elif s.is_close_only:
                         if slot == "close":
                             terms.append(in_pos(s, di, pos))        # 사장/점장: 마감만
@@ -269,7 +271,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 else:
                     m.Add(sh == 0)
 
-    # --- 하루 총 출근 인원 목표 (소프트) ---
+    # --- 하루 총 출근 인원 목표 (소프트 하한, 기존 기능) ---
     #   포지션x슬롯 필요인원과 별개. 파트타임 하루 종일 근무가 슬롯 여러 개를
     #   혼자 채워도 실제 출근 "머릿수"는 이 값을 목표로 한다 (사장님·점장 포함).
     headcount_short: dict[int, cp_model.IntVar] = {}
@@ -280,6 +282,27 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
             hs = m.NewIntVar(0, target_hc, f"hcshort_{di}")
             m.Add(total_work + hs >= target_hc)
             headcount_short[di] = hs
+
+    # --- 하루 총 출근 인원 상한 ---
+    #   그 날 "필요인원(포지션x슬롯) 총합"과 "하루 총 출근 인원 목표" 중 더 큰
+    #   값을 그 날 배치 가능한 최대 인원으로 삼는다. 필요인원은 원래 하한(>=)만
+    #   있어서, 다른 직원의 기본휴무 일수를 맞추려고 이미 다 채워진 날에 사람을
+    #   더 욱여넣어도 막을 방법이 없었다 — 그게 실제 보고된 버그(필요인원보다
+    #   많이 배치됨). 포지션x슬롯 단위가 아니라 하루 총원 단위로 상한을 두는 건
+    #   "하루 총 출근 인원 목표"가 포지션 필요인원보다 일부러 더 큰 값으로
+    #   설정될 수 있기 때문 (그 경우 특정 슬롯에 여유 인력을 배치하는 게 정상
+    #   동작이라 슬롯 단위로 막으면 그 기능이 깨짐).
+    daily_excess: dict[int, cp_model.IntVar] = {}
+    for di, d in enumerate(days):
+        wd = d.weekday()
+        day_req_sum = sum(
+            _req(inp, wd, pos, slot) for pos in _POS_LABEL for slot in _SLOTS
+        )
+        cap = max(day_req_sum, inp.daily_headcount_target)
+        total_work = sum(work[(s.id, di)] for s in staff)
+        de = m.NewIntVar(0, len(staff), f"dexcess_{di}")
+        m.Add(total_work - de <= cap)
+        daily_excess[di] = de
 
     # --- 관리 책임자 최소 1인 출근 (하드) ---
     mgr_group = [s for s in staff if s.in_manager_group]
@@ -392,10 +415,16 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
 
     # === 목표 (스펙 5 우선순위) ===
     # CP-SAT 속도를 위해 계단식이 아닌 '적당히 벌어진' 가중치를 쓴다.
-    # 위→아래: 근무일수 미달(기본휴무 위반) > 인원부족 > 초과근무 > 6일연속 >
-    #          사장주말 > 사장휴일균등 > 공정성 > 근무몰림 > 총근무
+    # 위→아래: 근무일수 미달(기본휴무 위반) > 인원부족 = 인원초과 > 초과근무 >
+    #          6일연속 > 사장주말 > 사장휴일균등 > 공정성 > 근무몰림 > 총근무
+    # 인원초과가 인원부족과 동급인 이유: 필요인원은 "정해진 인원" — 부족도
+    # 안 되고 초과도 안 됨. 다만 직원 총 근무 가능일이 필요인원 총합보다 많아
+    # (여유 인력) 기본휴무를 정확히 맞추려면 초과 배치가 불가피한 극히 드문
+    # 경우엔, 그보다 우선순위가 높은 기본휴무 준수를 위해 초과를 허용하고
+    # 경고로 알린다.
     W_OVERREST = 500_000   # 기준보다 더 쉬는 것(근무일수 미달) = 사실상 하드
     W_SHORT = 100_000
+    W_DAILY_EXCESS = 100_000  # 하루 총원 상한 초과 (부족과 동급 우선순위)
     W_HEADCOUNT = 100_000  # 하루 총 출근 인원 목표 미달 (필요인원과 동급 우선순위)
     W_UNDERREST = 4_000    # 초과근무 (인원 부족 시 허용)
     W_STREAK = 1_000       # 6일 이상 연속 근무 (불가피하면 허용)
@@ -408,6 +437,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     obj = (
         W_OVERREST * sum(over_rest.values())
         + W_SHORT * sum(shortage.values())
+        + W_DAILY_EXCESS * sum(daily_excess.values())
         + W_HEADCOUNT * sum(headcount_short.values())
         + W_UNDERREST * sum(under_rest.values())
         + W_STREAK * sum(streak_viol)
@@ -530,6 +560,28 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 )
             )
 
+    # --- 경고: 하루 총 출근 인원 상한 초과 ---
+    total_daily_excess = 0
+    for di, d in enumerate(days):
+        wd = d.weekday()
+        v = solver.Value(daily_excess[di])
+        if v > 0:
+            day_req_sum = sum(
+                _req(inp, wd, pos, slot) for pos in _POS_LABEL for slot in _SLOTS
+            )
+            cap = max(day_req_sum, inp.daily_headcount_target)
+            total_daily_excess += v
+            result.warnings.append(
+                SolveWarning(
+                    d.isoformat(),
+                    "총원",
+                    cap,
+                    cap + v,
+                    f"{d.isoformat()}: 필요인원 {cap}명인데 {cap + v}명 배치 (+{v}) · "
+                    f"다른 직원 근무일수를 맞추느라 초과 배치됐습니다",
+                )
+            )
+
     # --- 경고: 정직원/점장 근무일수(기본휴무) 미달 = 기준보다 더 쉼 ---
     name_by_id = {s.id: s.name for s in staff}
     target_by_id = {s.id: s.min_days_off for s in staff}
@@ -593,6 +645,7 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
 
     result.feasible = (
         total_short == 0
+        and total_daily_excess == 0
         and total_hc_short == 0
         and over_gap == 0
         and under_gap == 0

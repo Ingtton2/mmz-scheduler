@@ -42,6 +42,17 @@ def _n(cells: dict[str, str], *codes: str) -> int:
     return sum(1 for v in cells.values() if v in cs)
 
 
+def _real_problems(r):
+    """'초과 배치' 경고를 제외한 나머지 경고들.
+
+    _base_team() 처럼 직원 총 근무 가능일이 필요인원 총합보다 많은(여유 인력)
+    픽스처에서는, 전원 기본휴무를 정확히 지키면 필요인원보다 많이 배치되는
+    날이 불가피하게 생긴다 (근무일수 미달이 더 우선순위 높은 위반이라 그쪽을
+    피하는 대신 초과 배치를 택함) — 그건 기대되는 경고라 별도로 걸러낸다.
+    """
+    return [w for w in r.warnings if "초과 배치" not in w.message]
+
+
 def _base_team():
     """홀2 + 겸직2 + 주방5 정직원 (BASIC 요건을 정직원만으로 커버 가능)."""
     return [
@@ -59,8 +70,10 @@ def _base_team():
 
 def test_fills_all_position_slots():
     r = build_schedule(SolveInput(2026, 9, _base_team(), requirements=BASIC))
-    assert r.feasible is True
-    assert r.warnings == []
+    # _base_team() 9명 x 기본휴무 8일 근무가능일 총합(198) 이 BASIC 필요인원
+    # 총합(30일 x 6명 = 180)보다 많아 여유 인력이 생긴다 — 기본휴무를 전원
+    # 정확히 지키려면 며칠은 필요인원보다 많이 배치되는 게 불가피(경고로 표시).
+    assert _real_problems(r) == []
 
 
 def test_hall_staff_never_get_mid():
@@ -216,7 +229,7 @@ def test_days_off_pinned_to_target():
 
 def _assert_base_off_respected(r, staff, month_days: int):
     """정직원·점장은 (D/O + 사휴) == 기본휴무, 근무일수 == 전체 - 기본휴무 - 연차."""
-    assert r.feasible, [w.message for w in r.warnings]
+    assert _real_problems(r) == [], _real_problems(r)
     for s in staff:
         if s.min_days_off <= 0:
             continue
@@ -248,7 +261,7 @@ def test_manager_not_underworked_when_close_only():
         StaffInput(22, "사장B", "hall", role="owner"),
     ]
     r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
-    assert r.feasible, [w.message for w in r.warnings]
+    assert _real_problems(r) == [], _real_problems(r)
     su = r.shift_summary[20]
     assert su["work"] == 22 and su["off"] == 8, su
 
@@ -361,7 +374,7 @@ def test_no_6day_streak_when_slack():
         StaffInput(22, "사장B", "both", role="owner"),
     ]
     r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
-    assert r.feasible
+    assert _real_problems(r) == [], _real_problems(r)
     for s in staff:
         assert _max_streak(r.entries[s.id]) <= 5, (
             s.name,
@@ -389,7 +402,7 @@ def test_codes_reveal_position():
     # 홀 전담 -> FO/FC 만, 주방 전담 -> BO/BM/BC 만, 겸직 -> 그날 코드가 배정 포지션과 일치
     staff = _base_team()
     r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
-    assert r.feasible
+    assert _real_problems(r) == [], _real_problems(r)
     for sid in (1, 2):  # 홀 전담
         for c in r.entries[sid].values():
             assert c not in KITCHEN, (sid, c)
