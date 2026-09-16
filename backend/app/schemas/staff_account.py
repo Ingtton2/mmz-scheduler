@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
+from app.schemas.leave import LeaveBalanceRead
 from app.services.pin import is_valid_pin_format
 
 
@@ -56,6 +57,7 @@ class MeOut(BaseModel):
     position: str
     employment_type: str | None
     must_change_pin: bool = False
+    leave: LeaveBalanceRead | None = None  # 정직원·점장만 값이 있음
 
 
 class LoginResult(BaseModel):

@@ -1,6 +1,7 @@
 // 내 연차 신청 (스펙 9-4, 9-5). 다음 달 스케줄분만, 이번 달 20일까지.
 import { useEffect, useState } from "react";
 import {
+  cancelMyLeave,
   createMyLeave,
   getMe,
   listMyLeave,
@@ -14,6 +15,13 @@ import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils
 import MeNav from "./MeNav";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
+const fmtDays = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+const STATUS_BADGE: Record<string, string> = {
+  confirmed: "bg-mint text-mint-ink",
+  rejected: "bg-warn text-warn-ink",
+  requested: "bg-amber-100 text-amber-800",
+};
 
 export default function MyLeavePage() {
   const [me, setMe] = useState<MeInfo | null>(null);
@@ -21,6 +29,10 @@ export default function MyLeavePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showDetail, setShowDetail] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [pendingCancel, setPendingCancel] = useState<number | null>(null);
+  const [cancelingId, setCancelingId] = useState<number | null>(null);
 
   const windowOpen = selfServiceWindowOpen();
   const targetYm = selfServiceTargetYm();
@@ -55,6 +67,11 @@ export default function MyLeavePage() {
 
   const isPartTime = me?.employment_type === "part_time";
   const canSubmit = windowOpen && !isPartTime;
+  const leave = me?.leave ?? null;
+  const usedPct =
+    leave && leave.total_accrued > 0
+      ? Math.min(100, Math.max(0, Math.round((leave.used / leave.total_accrued) * 100)))
+      : 0;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,12 +79,27 @@ export default function MyLeavePage() {
     try {
       await createMyLeave(form.start_date, form.end_date, form.note.trim() || undefined);
       setForm({ ...form, note: "" });
+      setShowForm(false);
       setError("");
       await refresh();
     } catch (err) {
       setError(err instanceof MeApiError ? err.message : "신청에 실패했습니다.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onCancel(id: number) {
+    setCancelingId(id);
+    try {
+      await cancelMyLeave(id);
+      setPendingCancel(null);
+      setError("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof MeApiError ? err.message : "취소에 실패했습니다.");
+    } finally {
+      setCancelingId(null);
     }
   }
 
@@ -80,6 +112,54 @@ export default function MyLeavePage() {
       <p className="mb-4 text-sm text-gray-500">
         신청한 날짜는 다음 자동배치 때 근무에서 빠집니다 (연차 잔여일수 차감).
       </p>
+
+      {/* 연차 잔액 요약 */}
+      {leave && (
+        <div className="mb-4 rounded-lg border bg-white p-5">
+          <div className="text-center">
+            <div className="text-xs text-gray-500">잔여연차</div>
+            <div className="text-4xl font-bold text-[#B08968]">
+              {fmtDays(leave.remaining)}일
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="mb-1 flex justify-between text-xs text-gray-500">
+              <span>사용 {fmtDays(leave.used)}일</span>
+              <span>총 {fmtDays(leave.total_accrued)}일</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-[#B08968]"
+                style={{ width: `${usedPct}%` }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowDetail((v) => !v)}
+            className="mt-3 text-xs text-gray-500 underline"
+          >
+            {showDetail ? "상세 내역 접기" : "상세 내역 보기"}
+          </button>
+
+          {showDetail && (
+            <dl className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-sm">
+              <dt className="text-gray-500">전월잔여연차</dt>
+              <dd className="text-right">{fmtDays(leave.prev_remaining)}일</dd>
+              <dt className="text-gray-500">전월발생연차(1년미만)</dt>
+              <dd className="text-right">{fmtDays(leave.prev_accrued)}일</dd>
+              <dt className="text-gray-500">총연차</dt>
+              <dd className="text-right">{fmtDays(leave.total_accrued)}일</dd>
+              <dt className="text-gray-500">사용연차</dt>
+              <dd className="text-right">{fmtDays(leave.used)}일</dd>
+              <dt className="font-medium text-gray-700">잔여연차</dt>
+              <dd className="text-right font-medium">{fmtDays(leave.remaining)}일</dd>
+            </dl>
+          )}
+        </div>
+      )}
 
       {isPartTime ? (
         <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -97,46 +177,58 @@ export default function MyLeavePage() {
       )}
 
       {canSubmit && (
-        <form
-          onSubmit={onSubmit}
-          className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4"
-        >
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">시작일</span>
-            <input
-              type="date"
-              className={field}
-              value={form.start_date}
-              onChange={(e) => setStart(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium">종료일</span>
-            <input
-              type="date"
-              className={field}
-              min={form.start_date}
-              value={form.end_date}
-              onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            <span className="font-medium">메모 (선택)</span>
-            <input
-              className={field}
-              value={form.note}
-              onChange={(e) => setForm({ ...form, note: e.target.value })}
-              placeholder="예: 병원 예약, 가족 행사"
-            />
-          </label>
+        <div className="mb-6">
           <button
-            type="submit"
-            disabled={saving}
-            className="rounded-lg bg-[#B08968] hover:bg-[#997555] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="rounded-lg bg-[#B08968] hover:bg-[#997555] px-4 py-2 text-sm font-medium text-white"
           >
-            {saving ? "신청 중…" : "연차 신청"}
+            {showForm ? "신청 폼 닫기" : "연차 신청하기"}
           </button>
-        </form>
+
+          {showForm && (
+            <form
+              onSubmit={onSubmit}
+              className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4"
+            >
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">시작일</span>
+                <input
+                  type="date"
+                  className={field}
+                  value={form.start_date}
+                  onChange={(e) => setStart(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">종료일</span>
+                <input
+                  type="date"
+                  className={field}
+                  min={form.start_date}
+                  value={form.end_date}
+                  onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                />
+              </label>
+              <label className="flex flex-1 flex-col gap-1 text-sm">
+                <span className="font-medium">메모 (선택)</span>
+                <input
+                  className={field}
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  placeholder="예: 병원 예약, 가족 행사"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-lg bg-[#B08968] hover:bg-[#997555] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {saving ? "신청 중…" : "제출"}
+              </button>
+            </form>
+          )}
+        </div>
       )}
 
       {error && (
@@ -150,18 +242,19 @@ export default function MyLeavePage() {
               <th className="px-3 py-2">기간</th>
               <th className="px-3 py-2">상태</th>
               <th className="px-3 py-2">메모</th>
+              <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
                   불러오는 중…
                 </td>
               </tr>
             ) : requests.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
                   아직 신청한 연차가 없습니다.
                 </td>
               </tr>
@@ -172,11 +265,45 @@ export default function MyLeavePage() {
                     {fmtRange(r.start_date, r.end_date, r.days)}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    <span
+                      className={
+                        "rounded-full px-2 py-0.5 text-xs font-semibold " +
+                        (STATUS_BADGE[r.status] ?? "bg-gray-100 text-gray-600")
+                      }
+                    >
                       {LABEL.leaveStatus[r.status] ?? r.status}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {r.status !== "requested" ? (
+                      <span className="text-xs text-gray-400">사장님께 문의해주세요</span>
+                    ) : pendingCancel === r.id ? (
+                      <>
+                        <span className="text-xs text-gray-500">취소할까요?</span>
+                        <button
+                          onClick={() => onCancel(r.id)}
+                          disabled={cancelingId === r.id}
+                          className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs text-white disabled:opacity-50"
+                        >
+                          {cancelingId === r.id ? "취소 중…" : "취소"}
+                        </button>
+                        <button
+                          onClick={() => setPendingCancel(null)}
+                          className="ml-1 text-xs text-gray-500 hover:underline"
+                        >
+                          아니오
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setPendingCancel(r.id)}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        취소
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))
             )}

@@ -34,8 +34,9 @@ class StaffRole(str, Enum):
 
 class LeaveRequestStatus(str, Enum):
     """연차 신청 상태 (스펙 3)"""
-    REQUESTED = "requested"   # 직원이 신청함
-    CONFIRMED = "confirmed"   # 사장님이 확정함
+    REQUESTED = "requested"   # 직원이 신청함 (대기)
+    CONFIRMED = "confirmed"   # 사장님이 승인함
+    REJECTED = "rejected"     # 사장님이 반려함
 
 
 class TimeSlot(str, Enum):

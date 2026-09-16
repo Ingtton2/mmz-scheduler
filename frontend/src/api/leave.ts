@@ -8,7 +8,7 @@ export interface LeaveRequest {
   start_date: string; // "YYYY-MM-DD"
   end_date: string;
   days: number; // 기간 일수 (양끝 포함)
-  status: "requested" | "confirmed";
+  status: "requested" | "confirmed" | "rejected";
   note: string | null;
   created_at: string;
 }
@@ -18,7 +18,7 @@ export interface LeaveRequestCreate {
   start_date: string;
   end_date: string;
   note?: string | null;
-  status?: "requested" | "confirmed";
+  status?: "requested" | "confirmed" | "rejected";
 }
 
 export const listLeaveRequests = () => apiGet<LeaveRequest[]>("/leave-requests");

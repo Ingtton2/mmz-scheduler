@@ -14,6 +14,15 @@ export interface LoginableStaff {
   name: string;
 }
 
+export interface MyLeaveBalance {
+  base_off_days: number;
+  prev_remaining: number; // 전월잔여연차
+  prev_accrued: number; // 전월발생연차
+  used: number; // 사용연차
+  total_accrued: number; // 총연차 (자동계산)
+  remaining: number; // 잔여연차 (자동계산)
+}
+
 export interface MeInfo {
   id: number;
   name: string;
@@ -21,6 +30,7 @@ export interface MeInfo {
   position: string;
   employment_type: string | null;
   must_change_pin: boolean;
+  leave: MyLeaveBalance | null; // 정직원·점장만 값이 있음
 }
 
 export interface LoginResult {
@@ -66,6 +76,9 @@ export const listMyLeave = () => meGet<MyLeaveRequest[]>("/me/leave-requests");
 
 export const createMyLeave = (start_date: string, end_date: string, note?: string) =>
   meSend<MyLeaveRequest>("POST", "/me/leave-requests", { start_date, end_date, note });
+
+export const cancelMyLeave = (id: number) =>
+  meSend<void>("DELETE", `/me/leave-requests/${id}`);
 
 export const listMyDayOff = () => meGet<MyRequest[]>("/me/dayoff-requests");
 

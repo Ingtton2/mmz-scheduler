@@ -5,11 +5,12 @@ main.py 의 admin_auth 미들웨어는 "/api/me" 를 건드리지 않고 그냥 
 (관리자 토큰이 아니라 직원 토큰이 필요하므로). 대신 여기 get_current_staff 가
 Authorization: Bearer <직원 토큰> 을 직접 검증한다.
 
-  GET  /api/me                        내 정보
-  POST /api/me/change-pin             PIN 변경
-  GET  /api/me/leave-requests         내 연차 신청 목록
-  POST /api/me/leave-requests         내 연차 신청 (다음달만, 20일까지 — 스펙 9-5)
-  GET  /api/me/dayoff-requests        내 사전휴무 신청 목록
+  GET    /api/me                        내 정보 (+ 정직원·점장은 연차 잔액 포함)
+  POST   /api/me/change-pin             PIN 변경
+  GET    /api/me/leave-requests         내 연차 신청 목록
+  POST   /api/me/leave-requests         내 연차 신청 (다음달만, 20일까지 — 스펙 9-5)
+  DELETE /api/me/leave-requests/{id}    내 연차 신청 취소 (대기 중인 것만)
+  GET    /api/me/dayoff-requests        내 사전휴무 신청 목록
   POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일까지, 월 20일 한도)
   GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
   GET  /api/me/team-schedule/{year}/{month}  이번 달 전체 직원 스케줄 (공유된 것만)
@@ -25,14 +26,17 @@ from app.models import (
     MAX_PER_MONTH,
     DEFAULT_STORE_ID,
     DayOffRequest,
+    LeaveBalance,
     LeaveRequest,
     Schedule,
     ScheduleEntry,
     Staff,
     StaffAccount,
 )
+from app.schemas.leave import LeaveBalanceRead
 from app.schemas.me import MyDayOffRequestOut, MyLeaveRequestOut, MyRequestCreate, MyScheduleResult
 from app.schemas.schedule import PublicScheduleResult
+from app.schemas.staff import has_leave_balance
 from app.schemas.staff_account import ChangePinRequest, MeOut
 from app.services import pin as pin_service
 from app.services import staff_tokens
@@ -68,6 +72,22 @@ def _get_account(session: Session, staff_id: int) -> StaffAccount | None:
     ).first()
 
 
+def _get_leave(session: Session, staff: Staff) -> LeaveBalanceRead | None:
+    if not has_leave_balance(staff.role, staff.employment_type):
+        return None
+    bal = session.exec(
+        select(LeaveBalance).where(LeaveBalance.staff_id == staff.id)
+    ).first()
+    if bal is None:
+        return None
+    return LeaveBalanceRead.from_values(
+        base_off_days=bal.base_off_days,
+        prev_remaining=bal.prev_remaining,
+        prev_accrued=bal.prev_accrued,
+        used=bal.used,
+    )
+
+
 @router.get("", response_model=MeOut)
 def me(
     staff: Staff = Depends(get_current_staff), session: Session = Depends(get_session)
@@ -80,6 +100,7 @@ def me(
         position=staff.position,
         employment_type=staff.employment_type,
         must_change_pin=acc.must_change_pin if acc else False,
+        leave=_get_leave(session, staff),
     )
 
 
@@ -173,6 +194,24 @@ def create_my_leave(
         note=req.note,
         created_at=req.created_at,
     )
+
+
+@router.delete("/leave-requests/{request_id}", status_code=204)
+def cancel_my_leave(
+    request_id: int,
+    staff: Staff = Depends(get_current_staff),
+    session: Session = Depends(get_session),
+) -> None:
+    req = session.get(LeaveRequest, request_id)
+    if req is None or req.staff_id != staff.id:
+        raise HTTPException(status_code=404, detail="해당 신청을 찾을 수 없습니다.")
+    if req.status != "requested":
+        raise HTTPException(
+            status_code=400,
+            detail="이미 승인/반려된 신청은 취소할 수 없습니다. 사장님께 문의해주세요.",
+        )
+    session.delete(req)
+    session.commit()
 
 
 # --- 사전 휴무 ------------------------------------------------------------

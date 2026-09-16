@@ -99,10 +99,17 @@ export default function LeavePage() {
     }
   }
 
+  // 대기 -> 승인 -> 반려 -> 대기 순으로 클릭할 때마다 전환.
+  const NEXT_STATUS: Record<LeaveRequest["status"], LeaveRequest["status"]> = {
+    requested: "confirmed",
+    confirmed: "rejected",
+    rejected: "requested",
+  };
+
   async function toggleStatus(r: LeaveRequest) {
     try {
       await updateLeaveRequest(r.id, {
-        status: r.status === "confirmed" ? "requested" : "confirmed",
+        status: NEXT_STATUS[r.status] ?? "requested",
       });
       await refresh();
     } catch (e) {
@@ -135,10 +142,8 @@ export default function LeavePage() {
 
       <h1 className="mb-1 text-xl font-bold">연차 신청 관리</h1>
       <p className="mb-4 text-sm text-gray-500">
-        직원이 원하는 연차 날짜를 사장님이 대신 등록합니다. 등록된 날짜는
-        자동배치 때 그 직원을 그 날 빼고 시작합니다. (사장님도 “그 날 빼기”
-        용도로 쓸 수 있으며, 연차 잔여일수와는 무관합니다. 파트타임은 연차
-        개념이 없어 신청 대상이 아닙니다.)
+        직원의 연차 날짜를 승인/반려할 수 있으며, 등록된 날짜는
+        자동배치 때 그 직원을 그 날 빼고 시작합니다.
       </p>
 
       {!hasStaff && !loading && (
@@ -270,7 +275,9 @@ export default function LeavePage() {
                         "rounded-full px-2 py-0.5 text-xs font-semibold " +
                         (r.status === "confirmed"
                           ? "bg-mint text-mint-ink"
-                          : "bg-amber-100 text-amber-800")
+                          : r.status === "rejected"
+                            ? "bg-warn text-warn-ink"
+                            : "bg-amber-100 text-amber-800")
                       }
                       title="눌러서 상태 전환"
                     >
@@ -312,8 +319,8 @@ export default function LeavePage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        총 {requests.length}건 · “상태” 칸을 누르면 신청 ↔ 확정 이 전환됩니다.
-        데이터는 leave_request 표에 저장됩니다.
+        총 {requests.length}건 · “상태” 칸을 누르면 대기 → 승인 → 반려 순으로
+        전환됩니다. 데이터는 leave_request 표에 저장됩니다.
       </p>
     </div>
   );

@@ -28,8 +28,9 @@ const toMap = (arr: readonly { value: string; label: string }[]) =>
   Object.fromEntries(arr.map((o) => [o.value, o.label]));
 
 export const LEAVE_STATUS = [
-  { value: "requested", label: "신청" },
-  { value: "confirmed", label: "확정" },
+  { value: "requested", label: "대기" },
+  { value: "confirmed", label: "승인" },
+  { value: "rejected", label: "반려" },
 ] as const;
 
 // 0 = 월요일 ... 6 = 일요일  (파이썬 date.weekday() 와 동일)
