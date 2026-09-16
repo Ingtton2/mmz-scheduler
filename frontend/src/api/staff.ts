@@ -4,17 +4,14 @@ import { apiGet, apiSend } from "./client";
 // 연차 정보 (스펙 3). 정직원만 값이 있고, 파트타임/사장님은 null.
 export interface LeaveBalance {
   base_off_days: number;
-  prev_remaining: number;
-  prev_accrued: number;
-  used: number;
-  total_accrued: number; // 합연차 (자동)
-  remaining: number; // 잔여연차 (자동)
+  granted: number; // 부여연차 (누적)
+  used: number; // 사용연차 (누적)
+  remaining: number; // 잔여연차 (자동: 부여 - 사용)
 }
 
 export interface LeaveBalanceInput {
   base_off_days: number;
-  prev_remaining: number;
-  prev_accrued: number;
+  granted: number;
   used: number;
 }
 

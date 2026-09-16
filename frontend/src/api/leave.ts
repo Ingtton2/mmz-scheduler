@@ -8,6 +8,7 @@ export interface LeaveRequest {
   start_date: string; // "YYYY-MM-DD"
   end_date: string;
   days: number; // 기간 일수 (양끝 포함)
+  applied_at: string; // 신청일 (쉬는 날짜와는 다른 값)
   status: "requested" | "confirmed" | "rejected";
   note: string | null;
   created_at: string;
@@ -17,6 +18,7 @@ export interface LeaveRequestCreate {
   staff_id: number;
   start_date: string;
   end_date: string;
+  applied_at?: string | null; // 비우면 서버가 오늘 날짜로 저장
   note?: string | null;
   status?: "requested" | "confirmed" | "rejected";
 }
@@ -29,7 +31,7 @@ export const createLeaveRequest = (data: LeaveRequestCreate) =>
 export const updateLeaveRequest = (
   id: number,
   data: Partial<
-    Pick<LeaveRequest, "status" | "note" | "start_date" | "end_date">
+    Pick<LeaveRequest, "status" | "note" | "start_date" | "end_date" | "applied_at">
   >,
 ) => apiSend<LeaveRequest>("PATCH", `/leave-requests/${id}`, data);
 

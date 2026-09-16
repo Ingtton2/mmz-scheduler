@@ -10,6 +10,8 @@
   WorkCode            근무 코드 (매장별 커스텀)
   LeaveBalance        직원 연차 정보
   LeaveRequest        직원 연차 신청
+  LeaveGrantLog       연차 부여 이력
+  LeaveUsageLog       연차 사용 이력 (연차 승인 시 자동 기록)
   DayOffRequest       직원 사전 휴무 신청 (연차와 별개, 월 20일)
   StaffingRequirement 요일·시간대별 필요 인원
   Schedule            월 스케줄 (공유코드 = QR 대상)
@@ -25,7 +27,7 @@ from app.models.enums import (
     TimeSlot,
 )
 from app.models.dayoff import MAX_PER_MONTH, DayOffRequest
-from app.models.leave import LeaveBalance, LeaveRequest
+from app.models.leave import LeaveBalance, LeaveGrantLog, LeaveRequest, LeaveUsageLog
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
 from app.models.staff_account import StaffAccount
@@ -39,8 +41,10 @@ __all__ = [
     "DayOffRequest",
     "EmploymentType",
     "LeaveBalance",
+    "LeaveGrantLog",
     "LeaveRequest",
     "LeaveRequestStatus",
+    "LeaveUsageLog",
     "Position",
     "Schedule",
     "ScheduleEntry",

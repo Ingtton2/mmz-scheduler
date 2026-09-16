@@ -38,8 +38,7 @@ def _to_read(staff: Staff, bal: LeaveBalance | None) -> StaffRead:
     if has_leave_balance(staff.role, staff.employment_type) and bal is not None:
         leave = LeaveBalanceRead.from_values(
             base_off_days=bal.base_off_days,
-            prev_remaining=bal.prev_remaining,
-            prev_accrued=bal.prev_accrued,
+            granted=bal.granted,
             used=bal.used,
         )
     return StaffRead(
@@ -101,8 +100,7 @@ def create_staff(payload: StaffCreate, session: Session = Depends(get_session)) 
             store_id=DEFAULT_STORE_ID,
             staff_id=staff.id,
             base_off_days=payload.leave.base_off_days,
-            prev_remaining=payload.leave.prev_remaining,
-            prev_accrued=payload.leave.prev_accrued,
+            granted=payload.leave.granted,
             used=payload.leave.used,
         )
         session.add(bal)
@@ -170,8 +168,7 @@ def update_leave(
     if bal is None:
         bal = LeaveBalance(store_id=DEFAULT_STORE_ID, staff_id=staff_id)
     bal.base_off_days = payload.base_off_days
-    bal.prev_remaining = payload.prev_remaining
-    bal.prev_accrued = payload.prev_accrued
+    bal.granted = payload.granted
     bal.used = payload.used
     session.add(bal)
     session.commit()

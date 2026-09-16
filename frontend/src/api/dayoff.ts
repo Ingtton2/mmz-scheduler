@@ -10,6 +10,8 @@ export interface DayOffRequest {
   start_date: string; // "YYYY-MM-DD"
   end_date: string;
   days: number;
+  applied_at: string; // 신청일 (쉬는 날짜와는 다른 값)
+  status: "requested" | "confirmed" | "rejected";
   note: string | null;
   created_at: string;
 }
@@ -18,6 +20,7 @@ export interface DayOffRequestCreate {
   staff_id: number;
   start_date: string;
   end_date: string;
+  applied_at?: string | null; // 비우면 서버가 오늘 날짜로 저장
   note?: string | null;
 }
 
@@ -26,6 +29,13 @@ export const listDayOffRequests = () =>
 
 export const createDayOffRequest = (data: DayOffRequestCreate) =>
   apiSend<DayOffRequest>("POST", "/dayoff-requests", data);
+
+export const updateDayOffRequest = (
+  id: number,
+  data: Partial<
+    Pick<DayOffRequest, "status" | "note" | "start_date" | "end_date" | "applied_at">
+  >,
+) => apiSend<DayOffRequest>("PATCH", `/dayoff-requests/${id}`, data);
 
 export const deleteDayOffRequest = (id: number) =>
   apiSend<void>("DELETE", `/dayoff-requests/${id}`);

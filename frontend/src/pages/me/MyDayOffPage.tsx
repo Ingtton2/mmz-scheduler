@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { createMyDayOff, getMe, listMyDayOff, type MeInfo, type MyRequest } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
-import { fmtRange } from "../LeavePage";
+import { fmtRange } from "../../utils/format";
 import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils/month";
 import MeNav from "./MeNav";
 

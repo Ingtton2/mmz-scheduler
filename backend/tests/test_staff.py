@@ -11,11 +11,11 @@ def test_fulltime_has_leave_parttime_does_not(client: TestClient):
             "employment_type": "full_time",
             "position": "hall",
             "role": "staff",
-            "leave": {"prev_remaining": 3, "prev_accrued": 1.5, "used": 2},
+            "leave": {"granted": 4.5, "used": 2},
         },
     ).json()
     assert ft["leave"] is not None
-    assert ft["leave"]["total_accrued"] == 4.5
+    assert ft["leave"]["granted"] == 4.5
     assert ft["leave"]["remaining"] == 2.5
 
     pt = client.post(
@@ -25,7 +25,7 @@ def test_fulltime_has_leave_parttime_does_not(client: TestClient):
             "employment_type": "part_time",
             "position": "kitchen",
             "role": "staff",
-            "leave": {"prev_remaining": 10},  # 넣어도 무시됨
+            "leave": {"granted": 10},  # 넣어도 무시됨
         },
     ).json()
     assert pt["leave"] is None
@@ -49,7 +49,7 @@ def test_patch_leave_rejected_for_parttime(client: TestClient):
     ).json()["id"]
     res = client.patch(
         f"/api/staff/{pid}/leave",
-        json={"base_off_days": 0, "prev_remaining": 1, "prev_accrued": 1, "used": 0},
+        json={"base_off_days": 0, "granted": 2, "used": 0},
     )
     assert res.status_code == 400
 
@@ -66,10 +66,10 @@ def test_patch_leave_recomputes_for_fulltime(client: TestClient):
     ).json()["id"]
     res = client.patch(
         f"/api/staff/{sid}/leave",
-        json={"base_off_days": 0, "prev_remaining": 5, "prev_accrued": 2, "used": 3},
+        json={"base_off_days": 0, "granted": 7, "used": 3},
     )
     assert res.status_code == 200
-    assert res.json()["leave"]["total_accrued"] == 7
+    assert res.json()["leave"]["granted"] == 7
     assert res.json()["leave"]["remaining"] == 4
 
 

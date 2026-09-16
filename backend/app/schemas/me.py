@@ -21,6 +21,7 @@ class MyLeaveRequestOut(BaseModel):
     start_date: date
     end_date: date
     days: int
+    applied_at: date
     status: str
     note: str | None
     created_at: datetime

@@ -16,11 +16,9 @@ export interface LoginableStaff {
 
 export interface MyLeaveBalance {
   base_off_days: number;
-  prev_remaining: number; // 전월잔여연차
-  prev_accrued: number; // 전월발생연차
-  used: number; // 사용연차
-  total_accrued: number; // 총연차 (자동계산)
-  remaining: number; // 잔여연차 (자동계산)
+  granted: number; // 부여연차 (누적)
+  used: number; // 사용연차 (누적)
+  remaining: number; // 잔여연차 (자동계산: 부여 - 사용)
 }
 
 export interface MeInfo {
@@ -69,6 +67,7 @@ export interface MyRequest {
 }
 
 export interface MyLeaveRequest extends MyRequest {
+  applied_at: string; // 신청일 (쉬는 날짜와는 다른 값)
   status: string;
 }
 

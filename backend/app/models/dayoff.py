@@ -28,5 +28,7 @@ class DayOffRequest(SQLModel, table=True):
 
     start_date: date                     # 근무 불가 시작일
     end_date: date                       # 근무 불가 종료일 (포함). 하루면 start == end
+    applied_at: date = Field(default_factory=date.today)  # 신청일
+    status: str = "requested"            # LeaveRequestStatus 재사용: requested / confirmed / rejected
     note: str | None = None
     created_at: datetime = Field(default_factory=utcnow)

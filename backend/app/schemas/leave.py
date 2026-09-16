@@ -2,8 +2,8 @@
 연차 관련 API 데이터 형태 (스펙 3).
 
 - LeaveBalanceInput : 화면 -> 서버 (직원의 연차 숫자 입력값)
-- LeaveBalanceRead  : 서버 -> 화면 (입력값 + 합연차/잔여연차 자동계산 포함)
-- LeaveRequestCreate/Read/Update : 연차 신청 (지금은 사장님이 대신 입력)
+- LeaveBalanceRead  : 서버 -> 화면 (입력값 + 잔여연차 자동계산 포함)
+- LeaveRequestCreate/Read/Update : 연차 신청 (기간 + 신청일)
 """
 
 from datetime import date, datetime
@@ -30,31 +30,24 @@ class _DateRange(BaseModel):
 
 
 class LeaveBalanceInput(BaseModel):
-    base_off_days: int = Field(default=0, ge=0)     # 기본휴무
-    prev_remaining: float = Field(default=0, ge=0)  # 전월잔여연차
-    prev_accrued: float = Field(default=0, ge=0)    # 전월발생연차
-    used: float = Field(default=0, ge=0)            # 연차사용
+    base_off_days: int = Field(default=0, ge=0)  # 기본휴무
+    granted: float = Field(default=0, ge=0)      # 부여연차 (누적)
+    used: float = Field(default=0, ge=0)         # 사용연차 (누적)
 
 
 class LeaveBalanceRead(BaseModel):
     base_off_days: int
-    prev_remaining: float
-    prev_accrued: float
+    granted: float
     used: float
-    total_accrued: float  # 합연차 (자동계산)
-    remaining: float       # 잔여연차 (자동계산)
+    remaining: float  # 잔여연차 (자동계산)
 
     @classmethod
-    def from_values(
-        cls, base_off_days: int, prev_remaining: float, prev_accrued: float, used: float
-    ) -> "LeaveBalanceRead":
+    def from_values(cls, base_off_days: int, granted: float, used: float) -> "LeaveBalanceRead":
         return cls(
             base_off_days=base_off_days,
-            prev_remaining=prev_remaining,
-            prev_accrued=prev_accrued,
+            granted=granted,
             used=used,
-            total_accrued=leave_calc.total_accrued(prev_remaining, prev_accrued),
-            remaining=leave_calc.remaining(prev_remaining, prev_accrued, used),
+            remaining=leave_calc.remaining(granted, used),
         )
 
 
@@ -62,6 +55,7 @@ class LeaveRequestCreate(_DateRange):
     staff_id: int
     note: str | None = None
     status: LeaveRequestStatus = LeaveRequestStatus.REQUESTED
+    applied_at: date | None = None  # 비우면 오늘 날짜로 저장
 
 
 class LeaveRequestUpdate(BaseModel):
@@ -69,6 +63,7 @@ class LeaveRequestUpdate(BaseModel):
     note: str | None = None
     start_date: date | None = None
     end_date: date | None = None
+    applied_at: date | None = None
 
 
 class LeaveRequestRead(BaseModel):
@@ -78,6 +73,7 @@ class LeaveRequestRead(BaseModel):
     start_date: date
     end_date: date
     days: int              # 기간 일수 (양끝 포함)
+    applied_at: date       # 신청일
     status: str
     note: str | None
     created_at: datetime

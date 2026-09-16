@@ -6,6 +6,7 @@
 
   GET    /api/dayoff-requests        신청 목록 (직원 이름 포함, 시작일순)
   POST   /api/dayoff-requests        신청 추가 (기간 겹침 / 월 한도 초과 거부)
+  PATCH  /api/dayoff-requests/{id}   상태 변경(대기<->승인<->반려) 등 수정
   DELETE /api/dayoff-requests/{id}   신청 삭제
 """
 
@@ -16,7 +17,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import MAX_PER_MONTH, DEFAULT_STORE_ID, DayOffRequest, Staff
-from app.schemas.dayoff import DayOffRequestCreate, DayOffRequestRead
+from app.schemas.dayoff import DayOffRequestCreate, DayOffRequestRead, DayOffRequestUpdate
 from app.services.date_overlap import days_by_month, overlaps as _overlaps
 
 router = APIRouter(prefix="/dayoff-requests", tags=["dayoff-requests"])
@@ -34,6 +35,8 @@ def _to_read(req: DayOffRequest, staff_name: str) -> DayOffRequestRead:
         start_date=req.start_date,
         end_date=req.end_date,
         days=_days(req.start_date, req.end_date),
+        applied_at=req.applied_at,
+        status=req.status,
         note=req.note,
         created_at=req.created_at,
     )
@@ -91,12 +94,43 @@ def create_request(
         staff_id=payload.staff_id,
         start_date=payload.start_date,
         end_date=payload.end_date,
+        applied_at=payload.applied_at or date.today(),
+        status=payload.status.value,
         note=(payload.note or None),
     )
     session.add(req)
     session.commit()
     session.refresh(req)
     return _to_read(req, staff.name)
+
+
+@router.patch("/{request_id}", response_model=DayOffRequestRead)
+def update_request(
+    request_id: int, payload: DayOffRequestUpdate, session: Session = Depends(get_session)
+) -> DayOffRequestRead:
+    req = session.get(DayOffRequest, request_id)
+    if req is None or req.store_id != DEFAULT_STORE_ID:
+        raise HTTPException(status_code=404, detail="해당 신청을 찾을 수 없습니다.")
+
+    if payload.status is not None:
+        req.status = payload.status.value
+    if payload.start_date is not None:
+        req.start_date = payload.start_date
+    if payload.end_date is not None:
+        req.end_date = payload.end_date
+    if payload.applied_at is not None:
+        req.applied_at = payload.applied_at
+    if payload.note is not None:
+        req.note = payload.note or None
+    if req.end_date < req.start_date:
+        raise HTTPException(status_code=422, detail="종료일이 시작일보다 빠릅니다.")
+
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+
+    staff = session.get(Staff, req.staff_id)
+    return _to_read(req, staff.name if staff else "(삭제된 직원)")
 
 
 @router.delete("/{request_id}", status_code=204)

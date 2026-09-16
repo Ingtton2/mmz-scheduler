@@ -1,7 +1,7 @@
 // 사장님용 "직원 등록/관리" 화면 (스펙 6.1, 3).
-//  - 이름/역할/포지션/(고용형태) + 근무 가능 요일 + (정직원만) 연차 정보
-//  - 연차: 합연차 = 전월잔여 + 전월발생,  잔여연차 = 합연차 - 사용  (정직원만)
-//  - 파트타임: 근무 가능 요일을 골라 특정 요일만 나오게, "항상 배치" 로 고정 근무 가능
+//  - 정적 정보만 관리: 이름/역할/포지션/고용형태/근무 가능 요일/입사일
+//  - 월 최소 휴무일수(기본휴무)는 연차와 별개 값이라 여기 그대로 둠
+//  - 연차(부여/사용/잔여) 관리는 "연차 관리" 메뉴에서 한다.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -15,32 +15,19 @@ import {
 } from "../api/staff";
 import { EMPLOYMENT_TYPES, LABEL, POSITIONS, ROLES, WEEKDAYS } from "../labels";
 
-const num = (s: string) => {
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-};
-const round2 = (n: number) => Math.round(n * 100) / 100;
-const calcTotal = (pr: string, pa: string) => round2(num(pr) + num(pa));
-const calcRemaining = (pr: string, pa: string, u: string) =>
-  round2(calcTotal(pr, pa) - num(u));
-
 const fmtWeekdays = (days: number[], fixed: boolean) => {
   if (days.length === 7) return "매일";
   const labels = WEEKDAYS.filter((w) => days.includes(w.value)).map((w) => w.label);
   return labels.join("·") + (fixed ? " (고정)" : "");
 };
 
-type LeaveForm = {
-  base_off_days: string;
-  prev_remaining: string;
-  prev_accrued: string;
-  used: string;
-};
+// 서버 API는 아직 연차 숫자 4개를 한 번에 받는다(다음 단계에서 데이터 모델 정리 예정).
+// 이 페이지는 base_off_days 만 수정하고, 나머지는 기존 값을 그대로 실어 보낸다(덮어쓰기 방지).
+type LeaveForm = LeaveBalanceInput;
 const EMPTY_LEAVE: LeaveForm = {
-  base_off_days: "8", // 월 최소 휴일 기본값 (연차 제외)
-  prev_remaining: "0",
-  prev_accrued: "0",
-  used: "0",
+  base_off_days: 8, // 월 최소 휴무 기본값
+  granted: 0,
+  used: 0,
 };
 
 const EMPTY_FORM = {
@@ -54,20 +41,6 @@ const EMPTY_FORM = {
   leave: { ...EMPTY_LEAVE },
 };
 
-const LEAVE_FIELDS = [
-  ["base_off_days", "기본휴무 (월 고정, 연차 제외)"],
-  ["prev_remaining", "전월잔여연차"],
-  ["prev_accrued", "전월발생연차"],
-  ["used", "연차사용"],
-] as const;
-
-const toInput = (l: LeaveForm): LeaveBalanceInput => ({
-  base_off_days: Math.trunc(num(l.base_off_days)),
-  prev_remaining: num(l.prev_remaining),
-  prev_accrued: num(l.prev_accrued),
-  used: num(l.used),
-});
-
 export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [form, setForm] = useState({ ...EMPTY_FORM });
@@ -75,16 +48,14 @@ export default function StaffPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editLeave, setEditLeave] = useState<LeaveForm>({ ...EMPTY_LEAVE });
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
 
   // 기존 직원 클릭 -> 등록 폼에 정보 채워서 수정 모드로 전환 (삭제 후 재등록 금지).
   const [editingStaffId, setEditingStaffId] = useState<number | null>(null);
 
   const isOwner = form.role === "owner";
-  // 연차·기본휴무는 정직원 + 점장(정직원)만
-  const showLeave =
+  // 월 최소 휴무는 정직원 + 점장(정직원)만
+  const showBaseOff =
     (form.role === "staff" || form.role === "manager") &&
     form.employment_type === "full_time";
 
@@ -129,8 +100,8 @@ export default function StaffPage() {
           fixed_schedule: form.fixed_schedule,
           hire_date: form.hire_date || null,
         });
-        if (showLeave) {
-          await updateLeaveBalance(editingStaffId, toInput(form.leave));
+        if (showBaseOff) {
+          await updateLeaveBalance(editingStaffId, form.leave);
         }
         setEditingStaffId(null);
       } else {
@@ -142,7 +113,7 @@ export default function StaffPage() {
           work_weekdays: form.work_weekdays,
           fixed_schedule: form.fixed_schedule,
           hire_date: form.hire_date || null,
-          leave: toInput(form.leave),
+          leave: form.leave,
         });
       }
       setForm({ ...EMPTY_FORM, work_weekdays: [0, 1, 2, 3, 4, 5, 6], leave: { ...EMPTY_LEAVE } });
@@ -156,7 +127,6 @@ export default function StaffPage() {
   }
 
   function startEditStaff(s: Staff) {
-    setEditingId(null); // 인라인 연차 수정 중이었다면 닫기
     setEditingStaffId(s.id);
     setError("");
     setForm({
@@ -167,12 +137,12 @@ export default function StaffPage() {
       work_weekdays: s.work_weekdays,
       fixed_schedule: s.fixed_schedule,
       hire_date: s.hire_date ?? "",
+      // 기존 연차 숫자는 그대로 보존해서 실어 보낸다 (base_off_days만 화면에서 수정).
       leave: s.leave
         ? {
-            base_off_days: String(s.leave.base_off_days),
-            prev_remaining: String(s.leave.prev_remaining),
-            prev_accrued: String(s.leave.prev_accrued),
-            used: String(s.leave.used),
+            base_off_days: s.leave.base_off_days,
+            granted: s.leave.granted,
+            used: s.leave.used,
           }
         : { ...EMPTY_LEAVE },
     });
@@ -198,27 +168,6 @@ export default function StaffPage() {
   async function toggleFixed(s: Staff) {
     try {
       await updateStaff(s.id, { fixed_schedule: !s.fixed_schedule });
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }
-
-  function startEdit(s: Staff) {
-    if (!s.leave) return;
-    setEditingId(s.id);
-    setEditLeave({
-      base_off_days: String(s.leave.base_off_days),
-      prev_remaining: String(s.leave.prev_remaining),
-      prev_accrued: String(s.leave.prev_accrued),
-      used: String(s.leave.used),
-    });
-  }
-
-  async function saveEdit(id: number) {
-    try {
-      await updateLeaveBalance(id, toInput(editLeave));
-      setEditingId(null);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -369,56 +318,41 @@ export default function StaffPage() {
           </p>
         </fieldset>
 
-        {/* --- 연차 정보 (정직원만) --- */}
-        {showLeave ? (
+        {/* --- 월 최소 휴무 (정직원만, 연차와 별개) --- */}
+        {showBaseOff ? (
           <fieldset className="mt-4 rounded border border-gray-200 p-3">
             <legend className="px-1 text-sm font-medium text-gray-600">
-              연차 정보
+              월 최소 휴무
             </legend>
-            <div className="flex flex-wrap items-end gap-4">
-              {LEAVE_FIELDS.map(([key, label]) => (
-                <label key={key} className="flex flex-col gap-1 text-sm">
-                  <span className="text-gray-600">{label}</span>
-                  <input
-                    type="number"
-                    step={key === "base_off_days" ? 1 : 0.5}
-                    min={0}
-                    className={numField}
-                    value={form.leave[key]}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        leave: { ...form.leave, [key]: e.target.value },
-                      })
-                    }
-                  />
-                </label>
-              ))}
-              <div className="flex gap-4 rounded bg-gray-50 px-3 py-2 text-sm">
-                <div>
-                  <div className="text-xs text-gray-500">합연차 (자동)</div>
-                  <div className="font-semibold">
-                    {calcTotal(form.leave.prev_remaining, form.leave.prev_accrued)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">잔여연차 (자동)</div>
-                  <div className="font-semibold">
-                    {calcRemaining(
-                      form.leave.prev_remaining,
-                      form.leave.prev_accrued,
-                      form.leave.used,
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-gray-600">기본휴무 (월 고정, 연차 제외)</span>
+              <input
+                type="number"
+                step={1}
+                min={0}
+                className={numField}
+                value={form.leave.base_off_days}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    leave: {
+                      ...form.leave,
+                      base_off_days: Math.trunc(Number(e.target.value) || 0),
+                    },
+                  })
+                }
+              />
+            </label>
+            <p className="mt-2 text-xs text-gray-400">
+              자동배치가 한 달에 맞추려는 최소 휴무일 수입니다(기본 8일). 연차는
+              여기 포함되지 않고 “연차 관리” 메뉴에서 따로 관리합니다.
+            </p>
           </fieldset>
         ) : (
           <p className="mt-3 text-xs text-gray-400">
-            {isOwner ? "사장님" : "파트타임"}은 연차 정보를 관리하지 않습니다.
+            {isOwner ? "사장님" : "파트타임"}은 월 최소 휴무를 관리하지 않습니다.
             {form.role === "manager" &&
-              " (점장은 정직원이면 연차 정보를 관리합니다 — 고용형태를 정직원으로 두세요)"}
+              " (점장은 정직원이면 관리합니다 — 고용형태를 정직원으로 두세요)"}
           </p>
         )}
 
@@ -461,36 +395,27 @@ export default function StaffPage() {
               <th className="px-3 py-2">근무 요일</th>
               <th className="px-3 py-2">입사일</th>
               <th className="px-3 py-2 text-right">월휴일</th>
-              <th className="px-3 py-2 text-right">합연차</th>
-              <th className="px-3 py-2 text-right">사용</th>
-              <th className="px-3 py-2 text-right">잔여연차</th>
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
                   불러오는 중…
                 </td>
               </tr>
             ) : staff.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={8} className="px-3 py-6 text-center text-gray-400">
                   아직 등록된 직원이 없습니다.
                 </td>
               </tr>
             ) : (
               staff.map((s) => (
-                <FragmentRow
+                <StaffRow
                   key={s.id}
                   s={s}
-                  editing={editingId === s.id}
-                  editLeave={editLeave}
-                  setEditLeave={setEditLeave}
-                  onStartEdit={() => startEdit(s)}
-                  onCancelEdit={() => setEditingId(null)}
-                  onSaveEdit={() => saveEdit(s.id)}
                   onToggleFixed={() => toggleFixed(s)}
                   confirmingDelete={pendingDelete === s.id}
                   onAskDelete={() => setPendingDelete(s.id)}
@@ -506,23 +431,17 @@ export default function StaffPage() {
       </div>
 
       <p className="mt-3 text-xs text-gray-400">
-        총 {staff.length}명 · 연차·월휴일은 정직원만. “월휴일”은 자동배치가
-        맞추려는 한 달 휴무일(D/O) 수이며(기본 8일), 연차는 여기에 포함되지
-        않습니다. 사장님이 2명 이상이면 서로 휴일 수를 최대한 같게 맞춥니다.
-        합연차 = 전월잔여 + 전월발생, 잔여연차 = 합연차 − 사용.
+        총 {staff.length}명 · “월휴일”은 자동배치가 맞추려는 한 달 휴무일(D/O)
+        수이며(기본 8일, 정직원만), 연차는 여기에 포함되지 않습니다. 사장님이
+        2명 이상이면 서로 휴일 수를 최대한 같게 맞춥니다. 연차 부여/사용 현황은
+        “연차 관리” 메뉴에서 확인하세요.
       </p>
     </div>
   );
 }
 
-function FragmentRow({
+function StaffRow({
   s,
-  editing,
-  editLeave,
-  setEditLeave,
-  onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
   onToggleFixed,
   confirmingDelete,
   onAskDelete,
@@ -532,12 +451,6 @@ function FragmentRow({
   onStartEditInfo,
 }: {
   s: Staff;
-  editing: boolean;
-  editLeave: LeaveForm;
-  setEditLeave: (l: LeaveForm) => void;
-  onStartEdit: () => void;
-  onCancelEdit: () => void;
-  onSaveEdit: () => void;
   onToggleFixed: () => void;
   confirmingDelete: boolean;
   onAskDelete: () => void;
@@ -548,151 +461,80 @@ function FragmentRow({
 }) {
   const restricted = s.work_weekdays.length < 7;
   return (
-    <>
-      <tr className={"border-b last:border-0" + (editingInfo ? " bg-amber-50" : "")}>
-        <td className="px-3 py-2 font-medium">
+    <tr className={"border-b last:border-0" + (editingInfo ? " bg-amber-50" : "")}>
+      <td className="px-3 py-2 font-medium">
+        <button
+          type="button"
+          onClick={onStartEditInfo}
+          className="hover:underline"
+          title="눌러서 이 직원 정보 수정"
+        >
+          {s.name}
+        </button>
+      </td>
+      <td className="px-3 py-2">{LABEL.role[s.role] ?? s.role}</td>
+      <td className="px-3 py-2">{LABEL.position[s.position] ?? s.position}</td>
+      <td className="px-3 py-2">
+        {s.employment_type
+          ? (LABEL.employment[s.employment_type] ?? s.employment_type)
+          : "—"}
+      </td>
+      <td className="px-3 py-2">
+        <span className={restricted ? "text-gray-800" : "text-gray-400"}>
+          {fmtWeekdays(s.work_weekdays, s.fixed_schedule)}
+        </span>
+        {restricted && (
           <button
-            type="button"
-            onClick={onStartEditInfo}
-            className="hover:underline"
-            title="눌러서 이 직원 정보 수정"
+            onClick={onToggleFixed}
+            className="ml-2 text-[11px] text-gray-400 hover:underline"
+            title="고정 근무 켜기/끄기"
           >
-            {s.name}
+            {s.fixed_schedule ? "고정 해제" : "고정 설정"}
           </button>
-        </td>
-        <td className="px-3 py-2">{LABEL.role[s.role] ?? s.role}</td>
-        <td className="px-3 py-2">{LABEL.position[s.position] ?? s.position}</td>
-        <td className="px-3 py-2">
-          {s.employment_type
-            ? (LABEL.employment[s.employment_type] ?? s.employment_type)
-            : "—"}
-        </td>
-        <td className="px-3 py-2">
-          <span className={restricted ? "text-gray-800" : "text-gray-400"}>
-            {fmtWeekdays(s.work_weekdays, s.fixed_schedule)}
-          </span>
-          {restricted && (
+        )}
+      </td>
+      <td className="px-3 py-2">
+        {s.hire_date ?? <span className="text-gray-300">—</span>}
+      </td>
+
+      <td className="px-3 py-2 text-right">
+        {s.leave ? s.leave.base_off_days : <span className="text-gray-300">—</span>}
+      </td>
+
+      <td className="px-3 py-2 text-right whitespace-nowrap">
+        {confirmingDelete ? (
+          <>
+            <span className="text-xs text-gray-500">삭제할까요?</span>
             <button
-              onClick={onToggleFixed}
-              className="ml-2 text-[11px] text-gray-400 hover:underline"
-              title="고정 근무 켜기/끄기"
+              onClick={onConfirmDelete}
+              className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs text-white"
             >
-              {s.fixed_schedule ? "고정 해제" : "고정 설정"}
+              삭제
             </button>
-          )}
-        </td>
-        <td className="px-3 py-2">
-          {s.hire_date ?? <span className="text-gray-300">—</span>}
-        </td>
-
-        <td className="px-3 py-2 text-right">
-          {s.leave ? s.leave.base_off_days : <span className="text-gray-300">—</span>}
-        </td>
-        <td className="px-3 py-2 text-right">
-          {s.leave ? s.leave.total_accrued : <span className="text-gray-300">—</span>}
-        </td>
-        <td className="px-3 py-2 text-right">
-          {s.leave ? s.leave.used : <span className="text-gray-300">—</span>}
-        </td>
-        <td className="px-3 py-2 text-right font-semibold">
-          {s.leave ? s.leave.remaining : <span className="text-gray-300">—</span>}
-        </td>
-
-        <td className="px-3 py-2 text-right whitespace-nowrap">
-          {!editing &&
-            (confirmingDelete ? (
-              <>
-                <span className="text-xs text-gray-500">삭제할까요?</span>
-                <button
-                  onClick={onConfirmDelete}
-                  className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs text-white"
-                >
-                  삭제
-                </button>
-                <button
-                  onClick={onCancelDelete}
-                  className="ml-1 text-xs text-gray-500 hover:underline"
-                >
-                  취소
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={onStartEditInfo}
-                  className="text-xs text-gray-600 hover:underline"
-                >
-                  정보 수정
-                </button>
-                {s.leave && (
-                  <button
-                    onClick={onStartEdit}
-                    className="ml-2 text-xs text-gray-600 hover:underline"
-                  >
-                    연차 수정
-                  </button>
-                )}
-                <button
-                  onClick={onAskDelete}
-                  className="ml-2 text-xs text-red-600 hover:underline"
-                >
-                  삭제
-                </button>
-              </>
-            ))}
-        </td>
-      </tr>
-
-      {editing && s.leave && (
-        <tr className="border-b bg-amber-50 last:border-0">
-          <td colSpan={11} className="px-3 py-3">
-            <div className="flex flex-wrap items-end gap-4">
-              <span className="text-sm font-medium text-gray-700">
-                {s.name} 연차 수정
-              </span>
-              {LEAVE_FIELDS.map(([key, label]) => (
-                <label key={key} className="flex flex-col gap-1 text-sm">
-                  <span className="text-xs text-gray-600">{label}</span>
-                  <input
-                    type="number"
-                    step={key === "base_off_days" ? 1 : 0.5}
-                    min={0}
-                    className="w-24 rounded border border-gray-300 px-2 py-1 text-sm"
-                    value={editLeave[key]}
-                    onChange={(e) =>
-                      setEditLeave({ ...editLeave, [key]: e.target.value })
-                    }
-                  />
-                </label>
-              ))}
-              <div className="rounded bg-white px-3 py-2 text-sm">
-                <span className="text-xs text-gray-500">잔여연차 → </span>
-                <span className="font-semibold">
-                  {calcRemaining(
-                    editLeave.prev_remaining,
-                    editLeave.prev_accrued,
-                    editLeave.used,
-                  )}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={onSaveEdit}
-                  className="rounded bg-primary hover:bg-primary-dark px-3 py-1.5 text-xs font-medium text-white"
-                >
-                  저장
-                </button>
-                <button
-                  onClick={onCancelEdit}
-                  className="rounded border px-3 py-1.5 text-xs"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
+            <button
+              onClick={onCancelDelete}
+              className="ml-1 text-xs text-gray-500 hover:underline"
+            >
+              취소
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onStartEditInfo}
+              className="text-xs text-gray-600 hover:underline"
+            >
+              정보 수정
+            </button>
+            <button
+              onClick={onAskDelete}
+              className="ml-2 text-xs text-red-600 hover:underline"
+            >
+              삭제
+            </button>
+          </>
+        )}
+      </td>
+    </tr>
   );
 }

@@ -11,8 +11,7 @@ import {
 } from "react-router-dom";
 import AdminHome from "./pages/AdminHome";
 import StaffPage from "./pages/StaffPage";
-import LeavePage from "./pages/LeavePage";
-import DayOffPage from "./pages/DayOffPage";
+import LeaveManagementPage from "./pages/LeaveManagementPage";
 import StaffingPage from "./pages/StaffingPage";
 import SchedulePage from "./pages/SchedulePage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
@@ -116,15 +115,7 @@ export default function App() {
             path="/admin/leave"
             element={
               <RequireAuth>
-                <LeavePage />
-              </RequireAuth>
-            }
-          />
-          <Route
-            path="/admin/dayoff"
-            element={
-              <RequireAuth>
-                <DayOffPage />
+                <LeaveManagementPage />
               </RequireAuth>
             }
           />

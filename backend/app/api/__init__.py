@@ -14,6 +14,7 @@ from app.api import (
     routes_auth,
     routes_dayoff,
     routes_leave,
+    routes_leave_usage,
     routes_me,
     routes_public_accounts,
     routes_schedule,
@@ -26,6 +27,7 @@ api_router = APIRouter()
 api_router.include_router(routes_auth.router)
 api_router.include_router(routes_staff.router)
 api_router.include_router(routes_leave.router)
+api_router.include_router(routes_leave_usage.router)
 api_router.include_router(routes_dayoff.router)
 api_router.include_router(routes_staffing.router)
 api_router.include_router(routes_schedule.router)

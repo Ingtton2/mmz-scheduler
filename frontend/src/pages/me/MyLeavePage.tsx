@@ -10,7 +10,7 @@ import {
 } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
 import { LABEL } from "../../labels";
-import { fmtRange } from "../LeavePage";
+import { fmtRange } from "../../utils/format";
 import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils/month";
 import MeNav from "./MeNav";
 
@@ -69,8 +69,8 @@ export default function MyLeavePage() {
   const canSubmit = windowOpen && !isPartTime;
   const leave = me?.leave ?? null;
   const usedPct =
-    leave && leave.total_accrued > 0
-      ? Math.min(100, Math.max(0, Math.round((leave.used / leave.total_accrued) * 100)))
+    leave && leave.granted > 0
+      ? Math.min(100, Math.max(0, Math.round((leave.used / leave.granted) * 100)))
       : 0;
 
   async function onSubmit(e: React.FormEvent) {
@@ -126,7 +126,7 @@ export default function MyLeavePage() {
           <div className="mt-4">
             <div className="mb-1 flex justify-between text-xs text-gray-500">
               <span>사용 {fmtDays(leave.used)}일</span>
-              <span>총 {fmtDays(leave.total_accrued)}일</span>
+              <span>총 {fmtDays(leave.granted)}일</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
               <div
@@ -146,12 +146,8 @@ export default function MyLeavePage() {
 
           {showDetail && (
             <dl className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-sm">
-              <dt className="text-gray-500">전월잔여연차</dt>
-              <dd className="text-right">{fmtDays(leave.prev_remaining)}일</dd>
-              <dt className="text-gray-500">전월발생연차(1년미만)</dt>
-              <dd className="text-right">{fmtDays(leave.prev_accrued)}일</dd>
-              <dt className="text-gray-500">총연차</dt>
-              <dd className="text-right">{fmtDays(leave.total_accrued)}일</dd>
+              <dt className="text-gray-500">부여연차</dt>
+              <dd className="text-right">{fmtDays(leave.granted)}일</dd>
               <dt className="text-gray-500">사용연차</dt>
               <dd className="text-right">{fmtDays(leave.used)}일</dd>
               <dt className="font-medium text-gray-700">잔여연차</dt>
