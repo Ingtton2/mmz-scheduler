@@ -14,7 +14,7 @@ export default function MeNav({ current }: { current: string }) {
     <div className="mb-4 flex items-center justify-between text-sm">
       <div className="flex items-center gap-2 text-gray-500">
         <Link to="/me" className="hover:underline">
-          내 화면
+          HOME
         </Link>
         <span>/</span>
         <span className="text-gray-800">{current}</span>

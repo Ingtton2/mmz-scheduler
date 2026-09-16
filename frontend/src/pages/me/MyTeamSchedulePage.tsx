@@ -47,8 +47,7 @@ export default function MyTeamSchedulePage() {
       <MeNav current="전체 스케줄" />
       <h1 className="mb-1 text-xl font-bold">이번 달 전체 스케줄</h1>
       <p className="mb-4 text-sm text-gray-500">
-        동료 근무일 확인, 대타 부탁할 때 참고하세요. 사장님이 아직 공유하지
-        않은 달은 안 보여요.
+        사장님이 아직 공유하지 않은 달은 안 보여요.
       </p>
 
       <div className="mb-4 flex items-center gap-2">

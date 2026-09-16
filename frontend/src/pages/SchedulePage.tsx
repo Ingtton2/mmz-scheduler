@@ -232,9 +232,8 @@ export default function SchedulePage() {
 
       <h1 className="mb-1 text-xl font-bold">자동배치 · 수정 · 공유</h1>
       <p className="mb-4 text-sm text-gray-500">
-        “자동배치 실행”으로 근무표를 만들고, 표의 칸을 클릭해 직접 고칠 수
-        있습니다. 완성되면 “직원에게 공개”를 눌러주세요 — 직원이 이름+PIN으로
-        로그인해서 바로 확인할 수 있어요.
+        “자동배치 실행”으로 근무표를 만들 수 있으며, 표의 칸을 클릭해 직접 고칠 수
+        있습니다. 완성되면 “직원에게 공개”를 눌러주세요.
       </p>
 
       {/* 컨트롤 */}
