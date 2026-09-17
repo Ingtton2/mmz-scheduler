@@ -6,7 +6,15 @@
   2. 관리 책임자 최소 1인 출근  사장님 2 + 점장 1 중 매일 1명 이상 (하드, 최우선)
   3. 필요 인원 채우기          포지션 x 시간대(오픈/미들/마감)별 최소 인원 (소프트 + 경고)
   4. 포지션 매칭              전담은 해당 포지션만, 겸직은 그 날 한쪽 (하드)
-  5. 사장님/점장 배치          근무 시 항상 마감(C) 고정. 사장님은 주말 회피(소프트).
+  4.5 정직원·점장 휴무 공정성  주말(토/일)+공휴일 기준으로, 정직원·점장 각자 총휴무일수
+                             (D/O+연차+사전휴무)가 그 기간에 최소 2일 ~ 최대 4일 들어가도록
+                             보장 (전원 똑같이 나누는 게 아니라 상·하한만 보장, 하드에 준함).
+                             권장치 3일 쪽으로 당기는 건 훨씬 약한 소프트 선호.
+                             최소/최대 보장은 사장님 주말 회피(5번)보다 우선순위가 높음 —
+                             필요하면 사장님을 주말에 투입해서라도 맞춘다 (권장치 선호는
+                             사장님 주말 회피보다 약함).
+  5. 사장님/점장 배치          근무 시 항상 마감(C) 고정. 사장님은 주말 회피(소프트,
+                             단 4.5번 휴무 공정성에는 밀림).
   6. 공정성 (일반 직원만)      오픈/마감 몰아주기 방지 (소프트). 사장님·점장 제외.
   (+) 6일 이상 연속 근무 회피   소프트. 인원 부족으로 불가피하면 허용하고 경고.
   7. 부족분 경고              못 채워도 멈추지 않고 채운 만큼 + 경고
@@ -86,6 +94,15 @@ class StaffInput:
         """공정성 대상 = 일반 정직원. 사장/점장/파트타임 제외."""
         return self.role == "staff" and not self.is_part_time and self.min_days_off > 0
 
+    @property
+    def in_offday_fair_group(self) -> bool:
+        """휴무일수 공정성(주말+공휴일) 대상 = 정직원 + 점장. 사장/파트타임 제외."""
+        return (
+            self.role in ("staff", "manager")
+            and not self.is_part_time
+            and self.min_days_off > 0
+        )
+
 
 @dataclass
 class SolveInput:
@@ -96,6 +113,9 @@ class SolveInput:
     leave_dates: dict[int, set[date]] = field(default_factory=dict)
     # 사전 휴무 신청: 그 날 배치 금지 (하드), 총 근무일수는 유지 (다른 날로 채움)
     blocked_dates: dict[int, set[date]] = field(default_factory=dict)
+    # 등록된 공휴일(대체공휴일 포함). 정직원·점장 휴무 공정성 계산(주말+공휴일
+    # 기준)에만 쓰인다 — 그 외 배치 로직(필요인원 등)에는 영향 없음.
+    holiday_dates: set[date] = field(default_factory=set)
     # weekday -> {position -> {slot -> min_headcount}}
     requirements: dict[int, dict[str, dict[str, int]]] = field(default_factory=dict)
     # 하루 총 출근 인원 목표 (요일 무관, 사장님·점장 포함). 0 = 비활성.
@@ -353,6 +373,51 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         over_rest[s.id] = over
         under_rest[s.id] = under
 
+    # --- 정직원·점장 휴무일수 공정성 (주말+공휴일 기준, 하드에 준함) ---
+    #   대상: role in (staff, manager) 이면서 파트타임이 아니고 min_days_off > 0
+    #   인 사람 (= 기본휴무 목표가 있는 사람. 사장님·파트타임은 애초에 비교 기준이 없어 제외).
+    #   전원 똑같이 나누는 게 아니라, 그 달 "주말(토/일) + 등록된 공휴일"에서 각자
+    #   MIN_WEEKEND_HOLIDAY_OFF일 이상 ~ MAX_WEEKEND_HOLIDAY_OFF일 이하로 쉬도록
+    #   상·하한을 보장한다 (한 사람만 계속 주말·공휴일에 나오거나, 반대로 한 사람만
+    #   계속 그쪽으로 휴무가 몰리는 것 둘 다 막는 게 목적이지, 정확히 균등 분배하는
+    #   게 목적이 아님). 그 사람이 쉰 날 수 = 그 기간 일수 - 그 기간에 일한 날 수.
+    #   D/O·연차·사전휴무 모두 work==0 으로 표현되므로 work 변수만 보면 셋을 합친
+    #   총 휴무일수가 그대로 나온다. 최소/최대는 거의 하드로, 권장치(3일)는 그보다
+    #   훨씬 약한 소프트 선호로 둬서 여유가 있으면 3일 쪽으로 당기되, 다른 우선순위
+    #   높은 규칙과 부딪히면 쉽게 양보한다.
+    #   최소/최대 보장은 아래 "사장님 주말 회피"보다 우선순위가 높다
+    #   (W_OFFDAY_FAIR > W_OWNWKND) — 필요하면 사장님을 주말에 투입해서라도 맞춘다.
+    #   권장치(3일) 선호는 그보다 약해서 사장님 주말 회피에 밀린다.
+    MIN_WEEKEND_HOLIDAY_OFF = 2
+    TARGET_WEEKEND_HOLIDAY_OFF = 3
+    MAX_WEEKEND_HOLIDAY_OFF = 4
+    weekend_holiday_idx = [
+        di for di, d in enumerate(days) if d.weekday() >= 5 or d in inp.holiday_dates
+    ]
+    offday_fair_group = [s for s in staff if s.in_offday_fair_group]
+    offday_min_short: dict[int, cp_model.IntVar] = {}
+    offday_max_over: dict[int, cp_model.IntVar] = {}
+    offday_target_dev: dict[int, cp_model.IntVar] = {}
+    if weekend_holiday_idx and offday_fair_group:
+        n_wh = len(weekend_holiday_idx)
+        wh_min = min(MIN_WEEKEND_HOLIDAY_OFF, n_wh)  # 그 달 풀 자체가 더 작으면 그만큼만
+        wh_max = min(MAX_WEEKEND_HOLIDAY_OFF, n_wh)
+        wh_target = min(TARGET_WEEKEND_HOLIDAY_OFF, n_wh)
+        for s in offday_fair_group:
+            wh_off_expr = n_wh - sum(work[(s.id, di)] for di in weekend_holiday_idx)
+            short = m.NewIntVar(0, wh_min, f"offday_min_short_{s.id}")
+            m.Add(wh_off_expr + short >= wh_min)
+            offday_min_short[s.id] = short
+
+            over = m.NewIntVar(0, n_wh, f"offday_max_over_{s.id}")
+            m.Add(wh_off_expr - over <= wh_max)
+            offday_max_over[s.id] = over
+
+            dev = m.NewIntVar(0, n_wh, f"offday_target_dev_{s.id}")
+            m.Add(wh_off_expr - dev <= wh_target)
+            m.Add(wh_off_expr + dev >= wh_target)
+            offday_target_dev[s.id] = dev
+
     # --- 사장님 주말 회피 (소프트) + 2명 이상이면 휴일 균등 ---
     owners = [s for s in staff if s.is_owner]
     weekend_idx = [di for di, d in enumerate(days) if d.weekday() >= 5]
@@ -416,21 +481,29 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     # === 목표 (스펙 5 우선순위) ===
     # CP-SAT 속도를 위해 계단식이 아닌 '적당히 벌어진' 가중치를 쓴다.
     # 위→아래: 근무일수 미달(기본휴무 위반) > 인원부족 = 인원초과 > 초과근무 >
-    #          6일연속 > 사장주말 > 사장휴일균등 > 공정성 > 근무몰림 > 총근무
+    #          정직원·점장 휴무공정성(주말+공휴일 최소/최대) > 6일연속 > 사장주말 >
+    #          사장휴일균등 > 휴무공정성 권장치(3일) > 공정성 > 근무몰림 > 총근무
     # 인원초과가 인원부족과 동급인 이유: 필요인원은 "정해진 인원" — 부족도
     # 안 되고 초과도 안 됨. 다만 직원 총 근무 가능일이 필요인원 총합보다 많아
     # (여유 인력) 기본휴무를 정확히 맞추려면 초과 배치가 불가피한 극히 드문
     # 경우엔, 그보다 우선순위가 높은 기본휴무 준수를 위해 초과를 허용하고
     # 경고로 알린다.
+    # 휴무공정성이 사장주말보다 우선순위가 높은 이유: 정직원·점장 각자 주말·
+    # 공휴일에 최소 며칠은 쉬도록 보장하는 게, 사장님의 주말 근무를 피하는
+    # 것보다 우선이라고 요청받음 — 필요하면 사장님이 주말에 들어간다. 단 "권장
+    # 3일" 쪽으로 당기는 선호(W_OFFDAY_TARGET)는 최소/최대 보장보다 훨씬 약해서
+    # 사장주말보다도 아래 — 여유 있을 때만 3일에 가깝게 맞추는 수준.
     W_OVERREST = 500_000   # 기준보다 더 쉬는 것(근무일수 미달) = 사실상 하드
     W_SHORT = 100_000
     W_DAILY_EXCESS = 100_000  # 하루 총원 상한 초과 (부족과 동급 우선순위)
     W_HEADCOUNT = 100_000  # 하루 총 출근 인원 목표 미달 (필요인원과 동급 우선순위)
     W_UNDERREST = 4_000    # 초과근무 (인원 부족 시 허용)
+    W_OFFDAY_FAIR = 2_000  # 정직원·점장 휴무공정성(주말+공휴일 최소/최대) 위반 (하드에 준함)
     W_STREAK = 1_000       # 6일 이상 연속 근무 (불가피하면 허용)
     W_OWNWKND = 250
     W_OWNKITCHEN = 60      # 겸직 사장 마감을 주방(BC)에 넣는 것 (홀 우선)
     W_OWNSPREAD = 80
+    W_OFFDAY_TARGET = 40   # 휴무공정성 권장치(3일) 쪽으로 당기는 약한 선호
     W_FAIR = 25
     W_PEAK = 4
 
@@ -446,6 +519,12 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         + W_PEAK * peak
         + sum(work.values())
     )
+    if offday_min_short:
+        obj += W_OFFDAY_FAIR * sum(offday_min_short.values())
+    if offday_max_over:
+        obj += W_OFFDAY_FAIR * sum(offday_max_over.values())
+    if offday_target_dev:
+        obj += W_OFFDAY_TARGET * sum(offday_target_dev.values())
     if owner_spread is not None:
         obj += W_OWNSPREAD * owner_spread
     if shift_fair is not None:
@@ -616,6 +695,36 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 SolveWarning(
                     "", "초과근무", want, want - g,
                     f"{name_by_id[sid]}: 기본휴무 {want}일 목표인데 {want - g}일만 쉼 (+{g}일 초과근무) · 인원이 부족합니다",
+                )
+            )
+
+    # --- 경고: 정직원·점장 주말·공휴일 최소 휴무일수를 못 채운 경우 ---
+    offday_min_gap = 0
+    for sid, short in offday_min_short.items():
+        g = solver.Value(short)
+        if g > 0:
+            offday_min_gap += g
+            wh_off_v = MIN_WEEKEND_HOLIDAY_OFF - g
+            result.warnings.append(
+                SolveWarning(
+                    "", "휴무공정성", MIN_WEEKEND_HOLIDAY_OFF, wh_off_v,
+                    f"{name_by_id[sid]}: 주말·공휴일 최소 휴무 {MIN_WEEKEND_HOLIDAY_OFF}일 "
+                    f"목표인데 {wh_off_v}일만 쉼 (−{g}) · 인원이 부족합니다",
+                )
+            )
+
+    # --- 경고: 정직원·점장 주말·공휴일 최대 휴무일수를 초과한 경우 ---
+    offday_max_gap = 0
+    for sid, over in offday_max_over.items():
+        g = solver.Value(over)
+        if g > 0:
+            offday_max_gap += g
+            wh_off_v = MAX_WEEKEND_HOLIDAY_OFF + g
+            result.warnings.append(
+                SolveWarning(
+                    "", "휴무공정성", MAX_WEEKEND_HOLIDAY_OFF, wh_off_v,
+                    f"{name_by_id[sid]}: 주말·공휴일 최대 휴무 {MAX_WEEKEND_HOLIDAY_OFF}일 "
+                    f"기준인데 {wh_off_v}일 쉼 (+{g}) · 다른 인원 근무일수를 맞추느라 몰렸습니다",
                 )
             )
 

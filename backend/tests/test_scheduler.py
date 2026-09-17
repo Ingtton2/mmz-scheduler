@@ -358,6 +358,84 @@ def test_open_close_fair_among_regulars():
         assert max(closes) - min(closes) <= 3, (pos, closes)
 
 
+def test_offday_fairness_weekend_and_holiday_within_min_max():
+    """정직원+점장 각자 주말+공휴일 휴무가 최소 2일 ~ 최대 4일 사이에 들어오도록
+    보장 (전원 균등 분배가 아니라 상·하한만 보장).
+
+    holiday_dates 로 넘긴 평일 공휴일도 그 "주말+공휴일" 기간에 포함돼야 한다."""
+    staff = [
+        StaffInput(1, "홀A", "hall", min_days_off=10),
+        StaffInput(2, "홀B", "hall", min_days_off=10),
+        StaffInput(3, "겸직A", "both", min_days_off=10),
+        StaffInput(4, "겸직B", "both", min_days_off=10),
+        StaffInput(5, "주1", "kitchen", min_days_off=10),
+        StaffInput(6, "주2", "kitchen", min_days_off=10),
+        StaffInput(7, "주3", "kitchen", min_days_off=10),
+        StaffInput(20, "점장", "both", role="manager", min_days_off=10),
+        StaffInput(21, "사장A", "both", role="owner"),
+    ]
+    holiday = {date(2026, 9, 16)}  # 평일(수) 공휴일
+    r = build_schedule(
+        SolveInput(2026, 9, staff, requirements=BASIC, holiday_dates=holiday)
+    )
+    assert _real_problems(r) == [], _real_problems(r)
+
+    wh_days = [
+        d
+        for d in r.days
+        if date.fromisoformat(d).weekday() >= 5 or date.fromisoformat(d) in holiday
+    ]
+    assert len(wh_days) == 9  # 주말 8일 + 공휴일 1일
+
+    group_ids = (1, 2, 3, 4, 5, 6, 7, 20)  # 정직원 + 점장 (사장 제외)
+    for sid in group_ids:
+        wh_off = sum(1 for d in wh_days if r.entries[sid][d] not in WORK)
+        assert 2 <= wh_off <= 4, (sid, wh_off)
+    assert not any("휴무공정성" in w.message for w in r.warnings)
+
+
+def test_offday_fairness_warns_when_leave_forces_over_max():
+    """연차가 주말에 5일 몰려 있으면(하드로 근무 금지) 최대 4일 상한을 못 지킨다 —
+    이 경우 배치를 막지는 않고(경고만) 초과분을 알린다."""
+    staff = _base_team() + [
+        StaffInput(20, "점장", "both", role="manager", min_days_off=10),
+    ]
+    weekend_leave = {
+        date(2026, 9, d) for d in (5, 6, 12, 13, 19)  # 토,일,토,일,토 (연속 5일 연차)
+    }
+    r = build_schedule(
+        SolveInput(
+            2026, 9, staff, leave_dates={5: weekend_leave}, requirements=BASIC
+        )
+    )
+    assert any(
+        "최대 휴무" in w.message and "주1" in w.message for w in r.warnings
+    ), [w.message for w in r.warnings]
+
+
+def test_offday_fairness_pulls_owner_into_weekend_when_needed():
+    """대상 인원의 주말·공휴일 최소 휴무 보장을 위해 필요하면 사장님이 대신 근무한다
+    (사장님 주말 회피보다 이 규칙이 우선순위가 높음 — 명시적으로 뒤집은 우선순위)."""
+    req = {wd: {"kitchen": {"close": 1}} for wd in range(7)}
+    staff = [
+        # 기본휴무 4일뿐이라 거의 매일 근무해야 하는 점장. 아무 개입이 없으면
+        # 남는 4일의 D/O 를 평일에만 몰아 넣어도 근무일수 목표(26일)는 채워지므로,
+        # 주말 8일을 전부 근무해버릴 수 있다 (wh_off=0).
+        StaffInput(1, "점장", "kitchen", role="manager", min_days_off=4),
+        StaffInput(2, "사장", "kitchen", role="owner"),
+    ]
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=req))
+    assert r.feasible or all("연속" in w.message for w in r.warnings)
+
+    wh_days = [d for d in r.days if date.fromisoformat(d).weekday() >= 5]
+    mgr_wh_off = sum(1 for d in wh_days if r.entries[1][d] not in WORK)
+    assert mgr_wh_off >= 2, mgr_wh_off
+
+    # 점장이 쉬는 그 주말엔 마감 필요인원을 사장님이 대신 채워야 한다
+    owner_wh_worked = sum(1 for d in wh_days if r.entries[2][d] in WORK)
+    assert owner_wh_worked >= 2, owner_wh_worked
+
+
 def _max_streak(cells: dict[str, str]) -> int:
     best = run = 0
     for _k, v in sorted(cells.items()):

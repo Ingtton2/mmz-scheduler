@@ -18,6 +18,7 @@ from app.database import get_session
 from app.models import (
     DEFAULT_STORE_ID,
     DayOffRequest,
+    Holiday,
     LeaveBalance,
     LeaveRequest,
     Schedule,
@@ -110,6 +111,14 @@ def _load_daily_headcount_target(session: Session) -> int:
     return store.daily_headcount_target if store else 0
 
 
+def _load_holiday_dates(session: Session, year: int, month: int) -> set[date]:
+    """그 달에 등록된 공휴일 날짜 집합 (정직원·점장 휴무 공정성 계산용)."""
+    rows = session.exec(
+        select(Holiday).where(Holiday.store_id == DEFAULT_STORE_ID)
+    ).all()
+    return {r.date for r in rows if r.date.year == year and r.date.month == month}
+
+
 def _persist(
     session: Session, result_rows: dict[int, dict[str, str]], year: int, month: int
 ) -> Schedule:
@@ -185,6 +194,7 @@ def run_auto_schedule(
         ],
         leave_dates=_load_leave_dates(session),
         blocked_dates=_load_blocked_dates(session),
+        holiday_dates=_load_holiday_dates(session, payload.year, payload.month),
         requirements=_load_requirements(session),
         daily_headcount_target=_load_daily_headcount_target(session),
     )
