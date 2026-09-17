@@ -413,6 +413,48 @@ def test_offday_fairness_warns_when_leave_forces_over_max():
     ), [w.message for w in r.warnings]
 
 
+def test_offday_fairness_engine_do_targets_three_not_four():
+    """엔진이 스스로 배치하는 D/O(연차·사전휴무 없는 경우)는 권장치 3일에 수렴해야
+    한다 — 상한 4일까지 일부러 채우면 안 된다."""
+    staff = [
+        StaffInput(1, "홀A", "hall", min_days_off=10),
+        StaffInput(2, "홀B", "hall", min_days_off=10),
+        StaffInput(3, "겸직A", "both", min_days_off=10),
+        StaffInput(4, "겸직B", "both", min_days_off=10),
+        StaffInput(5, "주1", "kitchen", min_days_off=10),
+        StaffInput(6, "주2", "kitchen", min_days_off=10),
+        StaffInput(7, "주3", "kitchen", min_days_off=10),
+        StaffInput(20, "점장", "both", role="manager", min_days_off=10),
+        StaffInput(21, "사장A", "both", role="owner"),
+    ]
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    assert _real_problems(r) == [], _real_problems(r)
+
+    wh_days = [d for d in r.days if date.fromisoformat(d).weekday() >= 5]
+    group_ids = (1, 2, 3, 4, 5, 6, 7, 20)
+    for sid in group_ids:
+        wh_off = sum(1 for d in wh_days if r.entries[sid][d] not in WORK)
+        assert wh_off <= 3, (sid, wh_off)  # 강제하는 연차/사전휴무가 없으니 4일까지 갈 이유 없음
+
+
+def test_offday_fairness_accepts_forced_leave_at_four_without_fighting_it():
+    """연차·사전휴무로 이미 주말에 4일이 확정된 사람은, 다른 날 D/O 를 줄여서까지
+    3일로 끌어내리려 하면 안 된다 — 그 4일 그대로 인정한다."""
+    staff = _base_team() + [
+        StaffInput(20, "점장", "both", role="manager", min_days_off=10),
+    ]
+    forced = {date(2026, 9, d) for d in (5, 6, 12, 13)}  # 토,일,토,일 (4일)
+    r = build_schedule(
+        SolveInput(2026, 9, staff, leave_dates={5: forced}, requirements=BASIC)
+    )
+    wh_days = [d for d in r.days if date.fromisoformat(d).weekday() >= 5]
+    wh_off = sum(1 for d in wh_days if r.entries[5][d] not in WORK)
+    assert wh_off == 4, wh_off
+    assert not any(
+        "휴무공정성" in w.message and "주1" in w.message for w in r.warnings
+    ), [w.message for w in r.warnings]
+
+
 def test_offday_fairness_pulls_owner_into_weekend_when_needed():
     """대상 인원의 주말·공휴일 최소 휴무 보장을 위해 필요하면 사장님이 대신 근무한다
     (사장님 주말 회피보다 이 규칙이 우선순위가 높음 — 명시적으로 뒤집은 우선순위)."""
