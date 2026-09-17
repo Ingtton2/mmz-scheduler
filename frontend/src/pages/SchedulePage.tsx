@@ -470,7 +470,7 @@ export default function SchedulePage() {
                           {WD_CHAR[wd]}
                         </div>
                         {holidayName && (
-                          <div className="truncate px-0.5 text-[8px] leading-tight text-rose-600">
+                          <div className="line-clamp-2 px-0.5 text-[7px] leading-tight break-all text-rose-600">
                             {holidayName}
                           </div>
                         )}
