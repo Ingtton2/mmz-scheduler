@@ -149,10 +149,10 @@ export default function StaffingPage() {
           관리자 홈
         </Link>
         <span>/</span>
-        <span className="text-gray-800">필요 인원 설정</span>
+        <span className="text-gray-800">근무인원수 설정</span>
       </div>
 
-      <h1 className="mb-4 text-xl font-bold">필요 인원 설정</h1>
+      <h1 className="mb-4 text-xl font-bold">근무인원수 설정</h1>
 
       {/* --- 탭 --- */}
       <div className="mb-4 flex gap-1 border-b">
