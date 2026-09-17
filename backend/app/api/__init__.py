@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from app.api import (
     routes_auth,
     routes_dayoff,
+    routes_holiday,
     routes_leave,
     routes_leave_usage,
     routes_me,
@@ -30,6 +31,7 @@ api_router.include_router(routes_leave.router)
 api_router.include_router(routes_leave_usage.router)
 api_router.include_router(routes_dayoff.router)
 api_router.include_router(routes_staffing.router)
+api_router.include_router(routes_holiday.router)
 api_router.include_router(routes_schedule.router)
 api_router.include_router(routes_public_accounts.router)
 api_router.include_router(routes_staff_accounts.router)

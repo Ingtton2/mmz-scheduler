@@ -27,6 +27,7 @@ from app.models.enums import (
     TimeSlot,
 )
 from app.models.dayoff import MAX_PER_MONTH, DayOffRequest
+from app.models.holiday import Holiday
 from app.models.leave import LeaveBalance, LeaveGrantLog, LeaveRequest, LeaveUsageLog
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
@@ -40,6 +41,7 @@ __all__ = [
     "MAX_PER_MONTH",
     "DayOffRequest",
     "EmploymentType",
+    "Holiday",
     "LeaveBalance",
     "LeaveGrantLog",
     "LeaveRequest",

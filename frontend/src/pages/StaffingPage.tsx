@@ -6,6 +6,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  createHoliday,
+  deleteHoliday,
+  getHolidays,
+  type HolidayItem,
+} from "../api/holiday";
+import {
   getDailyHeadcountTarget,
   getStaffingRequirements,
   putDailyHeadcountTarget,
@@ -58,13 +64,20 @@ export default function StaffingPage() {
   const [savingHeadcount, setSavingHeadcount] = useState(false);
   const [headcountSavedMsg, setHeadcountSavedMsg] = useState("");
 
+  const [holidays, setHolidays] = useState<HolidayItem[]>([]);
+  const [newHolidayDate, setNewHolidayDate] = useState("");
+  const [newHolidayName, setNewHolidayName] = useState("");
+  const [savingHoliday, setSavingHoliday] = useState(false);
+
   async function refresh() {
     setLoading(true);
     try {
-      const [items, hc] = await Promise.all([
+      const [items, hc, hol] = await Promise.all([
         getStaffingRequirements(),
         getDailyHeadcountTarget(),
+        getHolidays(),
       ]);
+      setHolidays(hol);
       const g = emptyGrid();
       // 서버 값으로 덮어쓰기 (없는 칸은 0)
       for (const w of WEEKDAYS)
@@ -102,6 +115,32 @@ export default function StaffingPage() {
   useEffect(() => {
     refresh();
   }, []);
+
+  async function addHoliday() {
+    if (!newHolidayDate || !newHolidayName.trim()) return;
+    setSavingHoliday(true);
+    try {
+      await createHoliday(newHolidayDate, newHolidayName.trim());
+      setNewHolidayDate("");
+      setNewHolidayName("");
+      setHolidays(await getHolidays());
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingHoliday(false);
+    }
+  }
+
+  async function removeHoliday(id: number) {
+    try {
+      await deleteHoliday(id);
+      setHolidays((hs) => hs.filter((h) => h.id !== id));
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   function applyBase() {
     const g: Grid = {};
@@ -186,6 +225,67 @@ export default function StaffingPage() {
         </button>
         {headcountSavedMsg && (
           <span className="text-sm text-green-700">{headcountSavedMsg}</span>
+        )}
+      </div>
+
+      {/* 공휴일 관리 */}
+      <div className="mb-4 rounded-lg border bg-white p-4">
+        <div className="mb-1 text-sm font-medium">공휴일 관리</div>
+        <p className="mb-3 text-xs text-gray-500">
+          한국 공휴일(대체공휴일 포함)은 매년 날짜가 달라 자동 계산하지 않습니다.
+          날짜를 직접 등록하면 스케줄표에 표시됩니다. 자동배치 로직에는 영향을
+          주지 않습니다.
+        </p>
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-gray-600">날짜</span>
+            <input
+              type="date"
+              className="rounded border border-gray-300 px-2 py-1 text-sm"
+              value={newHolidayDate}
+              onChange={(e) => setNewHolidayDate(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-gray-600">이름</span>
+            <input
+              type="text"
+              placeholder="예: 추석"
+              className="w-32 rounded border border-gray-300 px-2 py-1 text-sm"
+              value={newHolidayName}
+              onChange={(e) => setNewHolidayName(e.target.value)}
+            />
+          </label>
+          <button
+            onClick={addHoliday}
+            disabled={savingHoliday || !newHolidayDate || !newHolidayName.trim()}
+            className="rounded bg-primary hover:bg-primary-dark px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {savingHoliday ? "등록 중…" : "등록"}
+          </button>
+        </div>
+        {holidays.length === 0 ? (
+          <p className="text-xs text-gray-400">등록된 공휴일이 없습니다.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {holidays.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-800"
+              >
+                <span>
+                  {h.date} · {h.name}
+                </span>
+                <button
+                  onClick={() => removeHoliday(h.id)}
+                  className="text-amber-600 hover:text-amber-900"
+                  aria-label={`${h.date} ${h.name} 삭제`}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
