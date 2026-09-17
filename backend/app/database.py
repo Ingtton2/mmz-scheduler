@@ -67,6 +67,14 @@ def _ensure_staff_columns() -> None:
             conn.execute(text("ALTER TABLE staff ADD COLUMN sort_order INTEGER DEFAULT 0"))
         if "hire_date" not in cols:
             conn.execute(text("ALTER TABLE staff ADD COLUMN hire_date DATE"))
+        if "kitchen_rotation" not in cols:
+            conn.execute(
+                text("ALTER TABLE staff ADD COLUMN kitchen_rotation BOOLEAN DEFAULT FALSE")
+            )
+        if "close_backup" not in cols:
+            conn.execute(
+                text("ALTER TABLE staff ADD COLUMN close_backup BOOLEAN DEFAULT FALSE")
+            )
 
 
 def _ensure_leave_balance_columns() -> None:

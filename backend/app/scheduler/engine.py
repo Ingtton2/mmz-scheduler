@@ -19,6 +19,11 @@
   5. 사장님/점장 배치          근무 시 항상 마감(C) 고정. 사장님은 주말 회피(소프트,
                              단 4.5번 휴무 공정성에는 밀림).
   6. 공정성 (일반 직원만)      오픈/마감 몰아주기 방지 (소프트). 사장님·점장 제외.
+  6.5 주방 로테이션 선호도     rotation_slot 이 있는 직원은 그 슬롯(오픈/미들/마감)에
+                             우선 배정 (소프트). 연차/사전휴무로 못 나오면 그날만
+                             다른 사람이 채우고 로테이션 자체는 안 깨짐.
+  6.6 마감 백업 선호도         close_backup=True 인 직원은, 점장이 쉬는 날 주방 마감
+                             자리를 우선 채움 (소프트).
   (+) 6일 이상 연속 근무 회피   소프트. 인원 부족으로 불가피하면 허용하고 경고.
   7. 부족분 경고              못 채워도 멈추지 않고 채운 만큼 + 경고
 
@@ -73,6 +78,8 @@ class StaffInput:
     fixed: bool = False           # 근무 가능 요일엔 항상 배치 (파트타임 고정 근무)
     min_days_off: int = 0         # 월 휴일(D/O) 목표. 연차 제외. 0=제한없음
     is_part_time: bool = False    # 파트타임 -> 풀오마 근무
+    rotation_slot: str | None = None  # 이번 달 로테이션 기본 포지션 (open/mid/close). 소프트 선호도.
+    close_backup: bool = False    # 점장 결근 시 주방 마감 자리를 우선 채울 백업 인원. 소프트 선호도.
 
     @property
     def is_owner(self) -> bool:
@@ -464,6 +471,37 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
             fair_terms.append(mx - mn)
     shift_fair = sum(fair_terms) if fair_terms else None
 
+    # --- 주방 로테이션 선호도 (소프트) ---
+    #   rotation_slot(open/mid/close) 이 있는 직원은 그 슬롯에 우선 배정한다.
+    #   so/sm/sc 가 있는 직원(정직원 — 사장·점장·파트타임은 슬롯 구분이 없어 제외)에만
+    #   적용. 그날 연차/사전휴무 등으로 못 나오면 work 자체가 0이라 벌점도 0 —
+    #   "그날만 다른 사람이 채우고 로테이션 자체는 안 깨진다"는 요구사항이 자연히 성립.
+    rotation_dev_terms = []
+    for s in staff:
+        if not s.rotation_slot or (s.id, 0) not in so:
+            continue
+        pref_var = {"open": so, "mid": sm, "close": sc}[s.rotation_slot]
+        for di in range(n_days):
+            rotation_dev_terms.append(work[(s.id, di)] - pref_var[(s.id, di)])
+    rotation_dev = sum(rotation_dev_terms) if rotation_dev_terms else None
+
+    # --- 마감 백업 선호도 (소프트) ---
+    #   점장이 쉬는 날, close_backup=True 인 직원을 주방 마감에 우선 배정한다.
+    #   점장이 정확히 1명일 때만 활성화 (0명/2명 이상이면 "쉬는 날" 의미가 불명확).
+    managers = [s for s in staff if s.is_manager]
+    backup_staff = [s for s in staff if s.close_backup and (s.id, 0) in sc]
+    close_backup_terms = []
+    if len(managers) == 1 and backup_staff:
+        mgr = managers[0]
+        for di in range(n_days):
+            mgr_off = 1 - work[(mgr.id, di)]
+            for b in backup_staff:
+                not_close = 1 - sc[(b.id, di)]
+                busy_not_close = _prod(work[(b.id, di)], not_close, f"backupnc_{b.id}_{di}")
+                miss = _prod(mgr_off, busy_not_close, f"backupmiss_{b.id}_{di}")
+                close_backup_terms.append(miss)
+    close_backup_dev = sum(close_backup_terms) if close_backup_terms else None
+
     # --- 근무 몰림 완화 ---
     peak = m.NewIntVar(0, n_days, "peak")
     for s in staff:
@@ -485,7 +523,8 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     # CP-SAT 속도를 위해 계단식이 아닌 '적당히 벌어진' 가중치를 쓴다.
     # 위→아래: 근무일수 미달(기본휴무 위반) > 인원부족 = 인원초과 > 초과근무 >
     #          정직원·점장 휴무공정성(주말+공휴일 최소/최대) > 6일연속 > 사장주말 >
-    #          사장휴일균등 > 휴무공정성 권장치(3일) > 공정성 > 근무몰림 > 총근무
+    #          휴무공정성 권장치(3일) = 주방로테이션 선호 = 마감백업 선호 >
+    #          사장휴일균등 > 공정성 > 근무몰림 > 총근무
     # 인원초과가 인원부족과 동급인 이유: 필요인원은 "정해진 인원" — 부족도
     # 안 되고 초과도 안 됨. 다만 직원 총 근무 가능일이 필요인원 총합보다 많아
     # (여유 인력) 기본휴무를 정확히 맞추려면 초과 배치가 불가피한 극히 드문
@@ -510,6 +549,8 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     W_STREAK = 1_000       # 6일 이상 연속 근무 (불가피하면 허용)
     W_OWNWKND = 250
     W_OFFDAY_TARGET = 200  # 휴무공정성 권장치(3일) 쪽으로 당기는 선호 (사장주말보다만 약함)
+    W_ROTATION_PREF = 150  # 주방 로테이션 기본 포지션 우선 배정 (소프트)
+    W_CLOSE_BACKUP = 150   # 점장 결근 시 마감 백업 우선 배정 (소프트)
     W_OWNSPREAD = 80
     W_OWNKITCHEN = 60      # 겸직 사장 마감을 주방(BC)에 넣는 것 (홀 우선)
     W_FAIR = 25
@@ -533,6 +574,10 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         obj += W_OFFDAY_FAIR * sum(offday_max_over.values())
     if offday_target_dev:
         obj += W_OFFDAY_TARGET * sum(offday_target_dev.values())
+    if rotation_dev is not None:
+        obj += W_ROTATION_PREF * rotation_dev
+    if close_backup_dev is not None:
+        obj += W_CLOSE_BACKUP * close_backup_dev
     if owner_spread is not None:
         obj += W_OWNSPREAD * owner_spread
     if shift_fair is not None:

@@ -14,6 +14,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, delete, select
 
+from app.api.routes_kitchen_rotation import get_or_compute_rotation
 from app.database import get_session
 from app.models import (
     DEFAULT_STORE_ID,
@@ -169,6 +170,7 @@ def run_auto_schedule(
 
     staff_rows = _load_active_staff(session)
     mdo = _load_min_days_off(session)
+    rotation = get_or_compute_rotation(session, payload.year, payload.month)
 
     inp = SolveInput(
         year=payload.year,
@@ -189,6 +191,8 @@ def run_auto_schedule(
                     if has_leave_balance(s.role, s.employment_type)
                     else 0
                 ),
+                rotation_slot=rotation.get(s.id),
+                close_backup=s.close_backup,
             )
             for s in staff_rows
         ],

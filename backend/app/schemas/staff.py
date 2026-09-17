@@ -37,6 +37,9 @@ class StaffCreate(BaseModel):
     work_weekdays: list[int] = ALL_WEEKDAYS
     fixed_schedule: bool = False
     hire_date: date | None = None
+    # 주방 오픈/미들/마감 3인 로테이션 대상 / 점장 결근 시 마감 백업 (자동배치 선호도)
+    kitchen_rotation: bool = False
+    close_backup: bool = False
     # 연차 숫자 (정직원만 실제로 저장됨)
     leave: LeaveBalanceInput = LeaveBalanceInput()
 
@@ -64,6 +67,8 @@ class StaffUpdate(BaseModel):
     work_weekdays: list[int] | None = None
     fixed_schedule: bool | None = None
     hire_date: date | None = None
+    kitchen_rotation: bool | None = None
+    close_backup: bool | None = None
 
     @field_validator("work_weekdays")
     @classmethod
@@ -82,6 +87,8 @@ class StaffRead(BaseModel):
     fixed_schedule: bool
     is_active: bool
     hire_date: date | None
+    kitchen_rotation: bool
+    close_backup: bool
     created_at: datetime
     leave: LeaveBalanceRead | None  # 정직원만 값이 있음
 

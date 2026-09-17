@@ -52,6 +52,8 @@ def _to_read(staff: Staff, bal: LeaveBalance | None) -> StaffRead:
         fixed_schedule=staff.fixed_schedule,
         is_active=staff.is_active,
         hire_date=staff.hire_date,
+        kitchen_rotation=staff.kitchen_rotation,
+        close_backup=staff.close_backup,
         created_at=staff.created_at,
         leave=leave,
     )
@@ -89,6 +91,8 @@ def create_staff(payload: StaffCreate, session: Session = Depends(get_session)) 
         work_weekdays=_wd_to_csv(payload.work_weekdays),
         fixed_schedule=payload.fixed_schedule,
         hire_date=payload.hire_date,
+        kitchen_rotation=payload.kitchen_rotation,
+        close_backup=payload.close_backup,
     )
     session.add(staff)
     session.commit()
@@ -133,6 +137,10 @@ def update_staff(
         staff.fixed_schedule = payload.fixed_schedule
     if payload.hire_date is not None:
         staff.hire_date = payload.hire_date
+    if payload.kitchen_rotation is not None:
+        staff.kitchen_rotation = payload.kitchen_rotation
+    if payload.close_backup is not None:
+        staff.close_backup = payload.close_backup
 
     # 사장님으로 바꾸면 고용형태 없음
     if staff.role == "owner":

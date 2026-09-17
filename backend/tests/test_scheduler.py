@@ -609,3 +609,82 @@ def test_auto_schedule_endpoint(client: TestClient, monkeypatch):
     # 점장은 근무일이 전부 마감(C)
     mgr = next(r for r in body["rows"] if r["staff_name"] == "점장A")
     assert mgr["summary"]["open"] == 0 and mgr["summary"]["mid"] == 0
+
+
+# --- 주방 로테이션 / 마감 백업 선호도 ---
+
+_KITCHEN_SLOT_CODE = {"open": CODE_BO, "mid": CODE_BM, "close": CODE_BC}
+
+
+def _rotation_team():
+    """홀2 + 겸직(재훈, 올라운더) + 로테이션 대상 3명(희명·도경·용상) + 현석(마감백업)
+    + 주2(일반) + 점장 + 사장. 로테이션 3인이 오픈/미들/마감 각각 하나씩 맡는다."""
+    return [
+        StaffInput(1, "홀A", "hall", min_days_off=8),
+        StaffInput(2, "홀B", "hall", min_days_off=8),
+        StaffInput(3, "재훈", "both", min_days_off=8),
+        StaffInput(4, "희명", "kitchen", min_days_off=8, rotation_slot="close"),
+        StaffInput(6, "도경", "kitchen", min_days_off=8, rotation_slot="mid"),
+        StaffInput(7, "용상", "kitchen", min_days_off=8, rotation_slot="open"),
+        StaffInput(8, "현석", "kitchen", min_days_off=8, close_backup=True),
+        StaffInput(9, "주2", "kitchen", min_days_off=8),
+        StaffInput(20, "주민", "both", role="manager", min_days_off=8),
+        StaffInput(21, "사장", "both", role="owner"),
+    ]
+
+
+def test_rotation_slot_preferred_assignment():
+    """rotation_slot 이 있는 직원은 근무하는 날 거의 전부 그 슬롯에 배정된다."""
+    staff = _rotation_team()
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    for sid, name, pref in ((4, "희명", "close"), (6, "도경", "mid"), (7, "용상", "open")):
+        codes = r.entries[sid]
+        worked = [c for c in codes.values() if c in WORK]
+        matched = sum(1 for c in worked if c == _KITCHEN_SLOT_CODE[pref])
+        assert worked, name
+        assert matched == len(worked), (name, pref, matched, len(worked))
+
+
+def test_rotation_soft_when_person_on_leave_only_that_day_is_covered():
+    """로테이션 담당자가 연차로 못 나오는 날만 다른 사람이 채우고, 나머지 날짜의
+    로테이션은 그대로 유지된다."""
+    staff = _rotation_team()
+    leave = {4: {date(2026, 9, 3), date(2026, 9, 4)}}  # 희명(마감 담당) 연차 2일
+    r = build_schedule(SolveInput(2026, 9, staff, leave_dates=leave, requirements=BASIC))
+
+    assert r.entries[4]["2026-09-03"] == CODE_LEAVE
+    assert r.entries[4]["2026-09-04"] == CODE_LEAVE
+    # 그날 마감은 다른 사람이 채움 (희명이 연차라도 필요인원 자체는 그대로)
+    others_filled = any(
+        r.entries[sid]["2026-09-03"] == CODE_BC for sid in (8, 9)
+    )
+    assert others_filled
+
+    # 희명의 나머지 근무일은 여전히 전부 마감
+    codes = r.entries[4]
+    worked_rest = [c for d, c in codes.items() if c in WORK and d not in leave[4]]
+    assert worked_rest and all(c == CODE_BC for c in worked_rest)
+
+
+def test_all_rounder_not_forced_into_rotation():
+    """rotation_slot 이 없는 올라운더(재훈)는 홀/주방 어느 슬롯이든 자유롭게 배정된다
+    (특정 슬롯에 몰리지 않아야 함 — 단일 슬롯 100% 고정이면 로테이션처럼 굳어버린 것)."""
+    staff = _rotation_team()
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    codes = [c for c in r.entries[3].values() if c in WORK]
+    assert codes  # 근무는 함
+    assert len(set(codes)) > 1, "재훈이 한 슬롯에만 고정 배정됨"
+
+
+def test_close_backup_fills_close_when_manager_off():
+    """점장이 쉬는 날, close_backup=True 인 현석이 근무하면 마감에 우선 배정된다."""
+    staff = _rotation_team()
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+
+    mgr_off_days = [d for d, c in r.entries[20].items() if c not in WORK]
+    assert mgr_off_days
+    hyunseok_working_days = [
+        d for d in mgr_off_days if r.entries[8][d] in WORK
+    ]
+    assert hyunseok_working_days
+    assert all(r.entries[8][d] == CODE_BC for d in hyunseok_working_days)

@@ -16,6 +16,7 @@
   StaffingRequirement 요일·시간대별 필요 인원
   Schedule            월 스케줄 (공유코드 = QR 대상)
   ScheduleEntry       스케줄 한 칸
+  KitchenRotationAssignment  주방 오픈/미들/마감 3인 로테이션의 그 달 담당
 """
 
 from app.models.enums import (
@@ -28,6 +29,7 @@ from app.models.enums import (
 )
 from app.models.dayoff import MAX_PER_MONTH, DayOffRequest
 from app.models.holiday import Holiday
+from app.models.kitchen_rotation import KitchenRotationAssignment
 from app.models.leave import LeaveBalance, LeaveGrantLog, LeaveRequest, LeaveUsageLog
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
@@ -42,6 +44,7 @@ __all__ = [
     "DayOffRequest",
     "EmploymentType",
     "Holiday",
+    "KitchenRotationAssignment",
     "LeaveBalance",
     "LeaveGrantLog",
     "LeaveRequest",

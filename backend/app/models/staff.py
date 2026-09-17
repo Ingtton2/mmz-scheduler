@@ -33,4 +33,10 @@ class Staff(SQLModel, table=True):
     is_active: bool = True         # 퇴사 시 False (기록은 남김)
     sort_order: int = 0            # 스케줄 표에서 보여줄 순서 (작을수록 위). 사장님은 항상 맨 아래.
     hire_date: date | None = None  # 입사일 (YYYY-MM-DD). 사장님이 직접 입력/수정.
+
+    # 주방 오픈/미들/마감 3인 월별 로테이션 대상인가 (자동배치 소프트 선호도).
+    kitchen_rotation: bool = False
+    # 점장이 쉬는 날, 주방 마감 자리를 대신 채우도록 우선 배정할 백업 인원인가.
+    close_backup: bool = False
+
     created_at: datetime = Field(default_factory=utcnow)
