@@ -226,6 +226,7 @@ def run_auto_schedule(
         edited=False,
         status=sched.status,
         share_code=sched.share_code,
+        published_at=sched.published_at,
         generated_at=utcnow(),
     )
 
@@ -284,6 +285,7 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
         edited=sched.edited,
         status=sched.status,
         share_code=sched.share_code,
+        published_at=sched.published_at,
         generated_at=sched.created_at,
     )
 
@@ -353,6 +355,7 @@ def share_schedule(
     if not sched.share_code:
         sched.share_code = secrets.token_urlsafe(9)
     sched.status = "confirmed"
+    sched.published_at = utcnow()
     session.add(sched)
     session.commit()
-    return ShareResult(share_code=sched.share_code)
+    return ShareResult(share_code=sched.share_code, published_at=sched.published_at)

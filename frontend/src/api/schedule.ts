@@ -44,6 +44,7 @@ export interface ScheduleResult {
   edited: boolean;
   status: "draft" | "confirmed";
   share_code: string | null;
+  published_at: string | null; // 직원에게 공개(공유)한 시각. 재공유 때마다 갱신.
   generated_at: string | null;
 }
 
@@ -55,6 +56,7 @@ export interface ScheduleEdit {
 
 export interface ShareResult {
   share_code: string;
+  published_at: string;
 }
 
 // 수동 수정에서 고를 수 있는 코드

@@ -170,6 +170,28 @@ def _ensure_dayoff_request_columns() -> None:
                 )
 
 
+def _ensure_schedule_columns() -> None:
+    """`published_at`(직원에게 공개한 시각) 컬럼을 새로 추가한다."""
+    with engine.begin() as conn:
+        if _is_sqlite:
+            cols = {
+                row[1]
+                for row in conn.exec_driver_sql("PRAGMA table_info(schedule)").fetchall()
+            }
+        else:
+            cols = {
+                row[0]
+                for row in conn.execute(
+                    text(
+                        "SELECT column_name FROM information_schema.columns "
+                        "WHERE table_name = 'schedule'"
+                    )
+                ).fetchall()
+            }
+        if "published_at" not in cols:
+            conn.execute(text("ALTER TABLE schedule ADD COLUMN published_at TIMESTAMP"))
+
+
 def init_db() -> None:
     """앱이 처음 켜질 때: 표를 만들고, 기본 매장 1개를 보장합니다."""
     import app.models  # noqa: F401  (모든 표를 SQLModel 에 등록시키기 위해)
@@ -181,6 +203,7 @@ def init_db() -> None:
     _ensure_leave_balance_columns()
     _ensure_leave_request_columns()
     _ensure_dayoff_request_columns()
+    _ensure_schedule_columns()
 
     with Session(engine) as session:
         existing = session.exec(select(Store).where(Store.id == DEFAULT_STORE_ID)).first()

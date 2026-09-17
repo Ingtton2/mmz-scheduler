@@ -24,6 +24,7 @@ class Schedule(SQLModel, table=True):
     status: str = "draft"                    # ScheduleStatus: draft / confirmed
     edited: bool = False                     # 자동배치 후 사장님이 수동 수정했는지
     share_code: str | None = Field(default=None, unique=True, index=True)  # QR URL 용 고유코드
+    published_at: datetime | None = None     # 직원에게 공개(공유)한 시각. 재공유 때마다 최신 시각으로 갱신.
     created_at: datetime = Field(default_factory=utcnow)
 
 

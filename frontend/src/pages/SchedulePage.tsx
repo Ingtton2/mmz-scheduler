@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import html2canvas from "html2canvas";
+import { getHolidays } from "../api/holiday";
 import {
   EDIT_CODES,
   editScheduleEntries,
@@ -22,6 +23,12 @@ const WD_CHAR = ["일", "월", "화", "수", "목", "금", "토"];
 function parseWd(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).getDay(); // 0=일 ~ 6=토
+}
+
+function fmtPublishedAt(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // 저장된 코드 -> 화면 표시(뱃지). 근무 코드마다 서로 다른 색 (memeal.zip 디자인 시스템).
@@ -95,6 +102,9 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // 공휴일(대체공휴일 포함) — 관리자가 등록한 날짜. 표시 전용, 자동배치엔 영향 없음.
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
+
   // 수동 수정
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [editingCell, setEditingCell] = useState<string | null>(null);
@@ -131,6 +141,18 @@ export default function SchedulePage() {
   useEffect(() => {
     loadSaved(year, month);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    getHolidays()
+      .then((list) => {
+        const map: Record<string, string> = {};
+        for (const h of list) map[h.date] = h.name;
+        setHolidays(map);
+      })
+      .catch(() => {
+        /* 표시 전용 정보라 실패해도 화면을 막지 않음 */
+      });
   }, []);
 
   async function handleRun() {
@@ -185,10 +207,10 @@ export default function SchedulePage() {
   async function handleShare() {
     setSharing(true);
     try {
-      await shareSchedule(year, month);
+      const { published_at } = await shareSchedule(year, month);
       setError("");
-      // 서버가 상태를 "confirmed" 로 바꿨으므로 화면에도 바로 반영 (재조회 없이).
-      setResult((r) => (r ? { ...r, status: "confirmed" } : r));
+      // 서버가 상태를 "confirmed" 로 바꾸고 공개 시각을 남겼으므로 화면에도 바로 반영 (재조회 없이).
+      setResult((r) => (r ? { ...r, status: "confirmed", published_at } : r));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -310,6 +332,11 @@ export default function SchedulePage() {
             {result.status === "confirmed" ? "공유됨 (직원에게 노출)" : "임시 (직원에게 안 보임)"}
           </span>
         )}
+        {result?.status === "confirmed" && result.published_at && (
+          <span className="text-xs text-gray-400">
+            {fmtPublishedAt(result.published_at)} 공개
+          </span>
+        )}
         {result?.saved && (
           <span className="text-xs text-gray-400">
             {result.solve_seconds > 0 && <>계산 {result.solve_seconds}s · </>}
@@ -413,18 +440,29 @@ export default function SchedulePage() {
                     const wd = parseWd(d);
                     const dayNum = Number(d.split("-")[2]);
                     const weekend = wd === 0 || wd === 6;
+                    const holidayName = holidays[d];
                     return (
                       <th
                         key={d}
+                        title={holidayName}
                         className={
                           "w-8 px-0 py-1 text-center font-medium " +
-                          (weekend ? "bg-amber-50 text-amber-700" : "")
+                          (holidayName
+                            ? "bg-rose-50 text-rose-700"
+                            : weekend
+                              ? "bg-amber-50 text-amber-700"
+                              : "")
                         }
                       >
                         <div>{dayNum}</div>
                         <div className="text-[10px] text-gray-400">
                           {WD_CHAR[wd]}
                         </div>
+                        {holidayName && (
+                          <div className="truncate px-0.5 text-[8px] leading-tight text-rose-600">
+                            {holidayName}
+                          </div>
+                        )}
                       </th>
                     );
                   })}

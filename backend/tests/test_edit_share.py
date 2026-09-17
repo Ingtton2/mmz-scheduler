@@ -110,6 +110,20 @@ def test_share_sets_confirmed_and_reuses_code(client: TestClient):
     assert client.post("/api/schedule/2026/10/share").json()["share_code"] == code
 
 
+def test_share_records_and_refreshes_published_at(client: TestClient):
+    _setup(client)
+    assert client.get("/api/schedule", params={"year": 2026, "month": 10}).json()["published_at"] is None
+
+    first = client.post("/api/schedule/2026/10/share").json()["published_at"]
+    assert first is not None
+    assert client.get("/api/schedule", params={"year": 2026, "month": 10}).json()["published_at"] == first
+
+    # 재공유하면 최신 시각으로 갱신된다.
+    second = client.post("/api/schedule/2026/10/share").json()["published_at"]
+    assert second is not None
+    assert second >= first
+
+
 def test_draft_hidden_until_shared(client: TestClient):
     """자동배치 직후(공유 전)엔 상태가 draft 이고, 로그인한 직원에게도 안 보인다."""
     _setup(client)

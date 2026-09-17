@@ -60,6 +60,7 @@ class ScheduleResult(BaseModel):
     edited: bool = False        # 수동 수정된 스케줄인지
     status: str = "draft"       # "draft"(임시) / "confirmed"(공유됨) — 직원 노출 여부를 가름
     share_code: str | None = None
+    published_at: datetime | None = None  # 직원에게 공개(공유)한 시각. 재공유 때마다 갱신.
     generated_at: datetime | None = None
 
 
@@ -87,6 +88,7 @@ class ManualEditRequest(BaseModel):
 
 class ShareResult(BaseModel):
     share_code: str
+    published_at: datetime
 
 
 class PublicRow(BaseModel):
