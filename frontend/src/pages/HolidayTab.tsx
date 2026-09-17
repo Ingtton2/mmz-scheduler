@@ -109,25 +109,34 @@ export default function HolidayTab() {
         ) : holidays.length === 0 ? (
           <p className="text-xs text-gray-400">등록된 공휴일이 없습니다.</p>
         ) : (
-          <ul className="flex flex-wrap gap-2">
-            {holidays.map((h) => (
-              <li
-                key={h.id}
-                className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-800"
-              >
-                <span>
-                  {h.date} · {h.name}
-                </span>
-                <button
-                  onClick={() => removeHoliday(h.id)}
-                  className="text-amber-600 hover:text-amber-900"
-                  aria-label={`${h.date} ${h.name} 삭제`}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-gray-50 text-left text-gray-500">
+                <tr>
+                  <th className="px-3 py-2">날짜</th>
+                  <th className="px-3 py-2">이름</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {holidays.map((h) => (
+                  <tr key={h.id} className="border-b last:border-0">
+                    <td className="px-3 py-2 whitespace-nowrap">{h.date}</td>
+                    <td className="px-3 py-2">{h.name}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={() => removeHoliday(h.id)}
+                        className="text-xs text-red-600 hover:underline"
+                        aria-label={`${h.date} ${h.name} 삭제`}
+                      >
+                        삭제
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </>
