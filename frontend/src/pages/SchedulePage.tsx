@@ -222,9 +222,20 @@ export default function SchedulePage() {
     if (!gridRef.current) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(gridRef.current, {
+      const el = gridRef.current;
+      // gridRef 는 overflow-x-auto 라 화면엔 스크롤해야 보이는 날짜도 있다 —
+      // 캡처된 이미지는 스크롤 없이 한 달 전체가 다 나오게, 클론에서만
+      // overflow 를 풀고 실제 콘텐츠 너비(scrollWidth)로 캡처한다.
+      const canvas = await html2canvas(el, {
         backgroundColor: "#ffffff",
         scale: 2,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth,
+        onclone: (_doc, clonedEl) => {
+          clonedEl.style.overflow = "visible";
+          clonedEl.style.width = `${el.scrollWidth}px`;
+        },
       });
       const url = canvas.toDataURL("image/png");
       const a = document.createElement("a");

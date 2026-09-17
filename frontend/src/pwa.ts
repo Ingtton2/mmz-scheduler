@@ -11,7 +11,7 @@ const ADMIN_MANIFEST = "/manifest-admin.webmanifest";
 const STAFF_MANIFEST = "/manifest-staff.webmanifest";
 const ADMIN_ICON = "/icons/admin-180.png";
 const STAFF_ICON = "/icons/staff-180.png";
-const ADMIN_THEME_COLOR = "#9C6B23";
+const ADMIN_THEME_COLOR = "#B08968";
 const STAFF_THEME_COLOR = "#B08968";
 
 type Persona = "admin" | "staff";
