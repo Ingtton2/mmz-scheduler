@@ -72,6 +72,9 @@ export interface MyRequest {
 
 export const listMyDayOff = () => meGet<MyRequest[]>("/me/dayoff-requests");
 
+export const deleteMyDayOff = (id: number) =>
+  meSend<void>("DELETE", `/me/dayoff-requests/${id}`);
+
 export const createMyDayOff = (start_date: string, end_date: string, note?: string) =>
   meSend<MyRequest>("POST", "/me/dayoff-requests", { start_date, end_date, note });
 

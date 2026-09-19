@@ -87,3 +87,51 @@ def test_reject_reason_reaches_staff_and_clears_when_reopened(client: TestClient
 
     client.patch(f"/api/dayoff-requests/{req['id']}", json={"status": "confirmed", "reject_reason": "무시됨"})
     assert mine()["reject_reason"] is None
+
+
+def test_staff_can_delete_own_pending_dayoff_only(client: TestClient, monkeypatch):
+    sid, token = _signup_and_approve(client, "직접삭제")
+    other_id, other_token = _signup_and_approve(client, "남의것")
+    monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 10))
+
+    def make(tok: str, day: str) -> int:
+        res = client.post(
+            "/api/me/dayoff-requests",
+            json={"start_date": day, "end_date": day},
+            headers=_auth(tok),
+        )
+        assert res.status_code == 201, res.text
+        return res.json()["id"]
+
+    mine = make(token, "2026-10-05")
+    theirs = make(other_token, "2026-10-06")
+
+    # 남의 신청은 못 지운다 (있는지조차 모르게 404)
+    assert client.delete(f"/api/me/dayoff-requests/{theirs}", headers=_auth(token)).status_code == 404
+
+    # 확정된 건은 못 지운다
+    client.patch(f"/api/dayoff-requests/{mine}", json={"status": "confirmed"})
+    res = client.delete(f"/api/me/dayoff-requests/{mine}", headers=_auth(token))
+    assert res.status_code == 400
+    assert "사장님께 문의" in res.json()["detail"]
+
+    # 다시 신청 상태가 되면 지울 수 있다
+    client.patch(f"/api/dayoff-requests/{mine}", json={"status": "requested"})
+    assert client.delete(f"/api/me/dayoff-requests/{mine}", headers=_auth(token)).status_code == 204
+    left = [r["id"] for r in client.get("/api/me/dayoff-requests", headers=_auth(token)).json()]
+    assert mine not in left
+
+
+def test_staff_cannot_delete_pending_after_cutoff(client: TestClient, monkeypatch):
+    _, token = _signup_and_approve(client, "마감후삭제")
+    monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 10))
+    req_id = client.post(
+        "/api/me/dayoff-requests",
+        json={"start_date": "2026-10-05", "end_date": "2026-10-05"},
+        headers=_auth(token),
+    ).json()["id"]
+
+    monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 21))
+    res = client.delete(f"/api/me/dayoff-requests/{req_id}", headers=_auth(token))
+    assert res.status_code == 400
+    assert "신청 기간" in res.json()["detail"]

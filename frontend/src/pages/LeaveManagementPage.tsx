@@ -17,6 +17,7 @@ import { listStaff, type Staff } from "../api/staff";
 import { LABEL } from "../labels";
 import ConfirmDialog from "../components/ConfirmDialog";
 import MonthFilterBar from "../components/MonthFilterBar";
+import Pagination, { paginate } from "../components/Pagination";
 import { rangeOverlapsMonth, todayYm } from "../utils/month";
 import { fmtRange } from "../utils/format";
 import LeaveUsageTab from "./LeaveUsageTab";
@@ -68,6 +69,7 @@ export default function LeaveManagementPage() {
   const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
   const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
   const [staffFilter, setStaffFilter] = useState("");
+  const [page, setPage] = useState(1);
 
   const [form, setForm] = useState({
     staff_id: "",
@@ -104,6 +106,7 @@ export default function LeaveManagementPage() {
     monthFilter === null
       ? staffRows
       : staffRows.filter((r) => rangeOverlapsMonth(r.start_date, r.end_date, monthFilter));
+  const pagedRows = paginate(visibleRows, page);
 
   function setStart(v: string) {
     setForm((f) => ({
@@ -356,7 +359,10 @@ export default function LeaveManagementPage() {
               id="staff-filter"
               className={field}
               value={staffFilter}
-              onChange={(e) => setStaffFilter(e.target.value)}
+              onChange={(e) => {
+                setStaffFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option value="">전체 직원</option>
               {staff.map((s) => (
@@ -371,7 +377,10 @@ export default function LeaveManagementPage() {
           </div>
           <MonthFilterBar
             month={monthFilter}
-            onChange={setMonthFilter}
+            onChange={(ym) => {
+              setMonthFilter(ym);
+              setPage(1);
+            }}
             total={staffRows.length}
             shown={visibleRows.length}
           />
@@ -405,7 +414,7 @@ export default function LeaveManagementPage() {
                     </td>
                   </tr>
                 ) : (
-                  visibleRows.map((r) => (
+                  pagedRows.map((r) => (
                     <tr key={rowKey(r)} className="border-b last:border-0">
                       <td className="px-3 py-2 font-medium whitespace-nowrap">
                         {fmtRange(r.start_date, r.end_date, r.days)}
@@ -478,6 +487,8 @@ export default function LeaveManagementPage() {
               </tbody>
             </table>
           </div>
+
+          <Pagination page={page} total={visibleRows.length} onChange={setPage} />
 
           <p className="mt-3 text-xs text-gray-400">
             총 {staffRows.length}건 · “상태” 칸을 누르면 대기 → 승인 → 반려 순으로

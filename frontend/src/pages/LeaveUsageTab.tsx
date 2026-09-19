@@ -3,6 +3,7 @@
 //  - 전 직원 연차 사용 현황 표 (입사일 표시 + 사장님이 직접 연차 추가)
 //  - 부여 이력 / 사용 이력 로그
 import { Fragment, useEffect, useState } from "react";
+import Pagination, { paginate } from "../components/Pagination";
 import { listStaff, type Staff } from "../api/staff";
 import {
   createGrant,
@@ -26,6 +27,8 @@ export default function LeaveUsageTab() {
   const [candidates, setCandidates] = useState<GrantCandidate[]>([]);
   const [grantLog, setGrantLog] = useState<LeaveGrant[]>([]);
   const [usageLog, setUsageLog] = useState<LeaveUsageLogEntry[]>([]);
+  const [grantPage, setGrantPage] = useState(1);
+  const [usagePage, setUsagePage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [grantingId, setGrantingId] = useState<number | null>(null);
@@ -274,7 +277,7 @@ export default function LeaveUsageTab() {
                   </td>
                 </tr>
               ) : (
-                grantLog.map((g) => (
+                paginate(grantLog, grantPage).map((g) => (
                   <tr key={g.id} className="border-b last:border-0">
                     <td className="px-3 py-2 whitespace-nowrap">{g.granted_at}</td>
                     <td className="px-3 py-2">{g.staff_name}</td>
@@ -286,6 +289,7 @@ export default function LeaveUsageTab() {
             </tbody>
           </table>
         </div>
+        <Pagination page={grantPage} total={grantLog.length} onChange={setGrantPage} />
       </section>
 
       {/* --- 사용 이력 --- */}
@@ -319,7 +323,7 @@ export default function LeaveUsageTab() {
                   </td>
                 </tr>
               ) : (
-                usageLog.map((u) => (
+                paginate(usageLog, usagePage).map((u) => (
                   <tr key={u.id} className="border-b last:border-0">
                     <td className="px-3 py-2 font-medium">{u.staff_name}</td>
                     <td className="px-3 py-2">
@@ -347,6 +351,7 @@ export default function LeaveUsageTab() {
             </tbody>
           </table>
         </div>
+        <Pagination page={usagePage} total={usageLog.length} onChange={setUsagePage} />
       </section>
     </div>
   );

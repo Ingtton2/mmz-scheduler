@@ -15,6 +15,7 @@ Authorization: Bearer <직원 토큰> 을 직접 검증한다.
   GET    /api/me/leave-usages           내 연차 사용 이력 (최신순)
   GET    /api/me/dayoff-requests        내 사전휴무 신청 목록
   POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일 17시까지, 월 20일 한도)
+  DELETE /api/me/dayoff-requests/{id} 내 사전휴무 삭제 (신청 상태인 것만, 20일 17시 전까지)
   GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
   GET  /api/me/team-schedule/{year}/{month}  이번 달 전체 직원 스케줄 (공유된 것만)
 """
@@ -49,7 +50,7 @@ from app.services import pin as pin_service
 from app.services import staff_tokens
 from app.services.date_overlap import days_by_month, overlaps
 from app.services.leave_usage_log import build_usage_log
-from app.services.request_window import check_window, kst_now
+from app.services.request_window import check_window, kst_now, window_open
 from app.services.schedule_summary import summarize
 from app.services.schedule_view import build_public_view, get_confirmed_schedule
 
@@ -275,6 +276,29 @@ def create_my_dayoff(
         note=req.note,
         created_at=req.created_at,
     )
+
+
+@router.delete("/dayoff-requests/{request_id}", status_code=204)
+def delete_my_dayoff(
+    request_id: int,
+    staff: Staff = Depends(get_current_staff),
+    session: Session = Depends(get_session),
+) -> None:
+    req = session.get(DayOffRequest, request_id)
+    if req is None or req.staff_id != staff.id:
+        raise HTTPException(status_code=404, detail="해당 신청을 찾을 수 없습니다.")
+    if req.status != "requested":
+        raise HTTPException(
+            status_code=400,
+            detail="이미 확정/반려된 신청은 삭제할 수 없습니다. 사장님께 문의해주세요.",
+        )
+    if not window_open(_today(), _now().time()):
+        raise HTTPException(
+            status_code=400,
+            detail="신청 기간이 지나 삭제할 수 없습니다. 사장님께 문의해주세요.",
+        )
+    session.delete(req)
+    session.commit()
 
 
 # --- 공휴일 (표시 전용) ---------------------------------------------------

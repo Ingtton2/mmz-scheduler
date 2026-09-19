@@ -1,7 +1,15 @@
 // 내 사전 휴무 신청 (스펙 9-4, 9-5). 다음 달 스케줄분만, 이번 달 20일 17시까지.
 import { Fragment, useEffect, useState } from "react";
-import { createMyDayOff, getMe, listMyDayOff, type MeInfo, type MyRequest } from "../../api/me";
+import {
+  createMyDayOff,
+  deleteMyDayOff,
+  getMe,
+  listMyDayOff,
+  type MeInfo,
+  type MyRequest,
+} from "../../api/me";
 import { MeApiError } from "../../api/meClient";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { fmtRange } from "../../utils/format";
 import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils/month";
 import MeNav from "./MeNav";
@@ -21,6 +29,7 @@ export default function MyDayOffPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<MyRequest | null>(null);
 
   const windowOpen = selfServiceWindowOpen();
   const targetYm = selfServiceTargetYm();
@@ -68,6 +77,20 @@ export default function MyDayOffPage() {
       setError(err instanceof MeApiError ? err.message : "신청에 실패했습니다.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  // 삭제는 신청 상태 + 신청 기간 안일 때만 — 목록의 삭제 버튼 노출과 서버가 같은 규칙으로 막는다.
+  async function onDelete() {
+    if (!pendingDelete) return;
+    try {
+      await deleteMyDayOff(pendingDelete.id);
+      setError("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof MeApiError ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setPendingDelete(null);
     }
   }
 
@@ -180,6 +203,15 @@ export default function MyDayOffPage() {
                         >
                           {STATUS[r.status]?.label ?? r.status}
                         </span>
+                        {r.status === "requested" && windowOpen && (
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(r)}
+                            className="mt-1 block text-xs text-red-600 hover:underline"
+                          >
+                            삭제
+                          </button>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
                     </tr>
@@ -197,6 +229,15 @@ export default function MyDayOffPage() {
           </tbody>
         </table>
       </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="삭제하시겠습니까?"
+          message={fmtRange(pendingDelete.start_date, pendingDelete.end_date, pendingDelete.days)}
+          onConfirm={onDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }
