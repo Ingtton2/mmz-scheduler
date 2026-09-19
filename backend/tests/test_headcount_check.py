@@ -82,3 +82,17 @@ def test_saved_schedule_warns_after_manual_edit_adds_extra_person(client: TestCl
     warnings = res.json()["warnings"]
     assert any(w["date"] == day for w in warnings), warnings
     assert client.get("/api/schedule", params={"year": 2026, "month": 10}).json()["warnings"] == warnings
+
+
+def test_all_managers_and_owners_off_triggers_warning():
+    """사장님 둘 + 점장이 같은 날 모두 쉬면(수기 수정 등) 관리 책임자 경고."""
+    cells = _cells({1: "FO", 2: "FC", 3: "BO", 4: "BM", 5: "BC", 6: "BC", 10: "D/O", 11: "D/O", 12: "연차"})
+    out = check_headcount([DAY], cells, {}, REQ, manager_group_ids={10, 11, 12})
+    mgr = [w for w in out if w.position == "관리책임자"]
+    assert len(mgr) == 1 and mgr[0].date == DAY
+
+
+def test_one_manager_group_member_working_is_fine():
+    cells = _cells({1: "FO", 2: "FC", 3: "BO", 4: "BM", 5: "BC", 6: "BC", 10: "D/O", 11: "D/O", 12: "BC"})
+    out = check_headcount([DAY], cells, {}, REQ, manager_group_ids={10, 11, 12})
+    assert not [w for w in out if w.position == "관리책임자"]

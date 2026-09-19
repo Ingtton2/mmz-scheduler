@@ -20,6 +20,7 @@ import {
   getLeavePlan,
   getSavedSchedule,
   runAutoSchedule,
+  setAutoLock,
   shareSchedule,
   type LeaveDays,
   type LeavePlanRow,
@@ -116,6 +117,9 @@ export default function SchedulePage() {
   const [rotation, setRotation] = useState<RotationItem[]>([]);
   const [rotationSaved, setRotationSaved] = useState(false);
   const [rotationEdited, setRotationEdited] = useState(false);
+  // 이미 직원에게 공개된 스케줄을 자동배치로 덮어쓰기 전 확인 창
+  const [confirmRun, setConfirmRun] = useState(false);
+  const [locking, setLocking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -226,7 +230,33 @@ export default function SchedulePage() {
   }
   const leaveHasError = leavePlan.some((r) => leaveInputError(r) !== "");
 
+  // 실행 버튼: 이미 공개된 스케줄이 있으면 확인 창을 먼저 띄운다 (실수로 덮어쓰기 방지)
+  async function handleToggleLock() {
+    if (!result?.saved) return;
+    setLocking(true);
+    try {
+      const r = await setAutoLock(year, month, !result.auto_locked);
+      // 화면의 나머지(표·경고)는 그대로 두고 잠금 상태만 갱신
+      setResult((prev) => (prev ? { ...prev, auto_locked: r.auto_locked } : prev));
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLocking(false);
+    }
+  }
+
+  function onRunClick() {
+    if (result?.auto_locked) return;
+    if (result?.saved && result.status === "confirmed") {
+      setConfirmRun(true);
+    } else {
+      handleRun();
+    }
+  }
+
   async function handleRun() {
+    setConfirmRun(false);
     const leaveDays: LeaveDays = {};
     for (const r of leavePlan) {
       const n = Number((leaveInputs[r.staff_id] ?? "").trim() || "0");
@@ -492,12 +522,20 @@ export default function SchedulePage() {
 
         <div className="flex flex-wrap items-end gap-3">
         <button
-          onClick={handleRun}
-          disabled={running || leaveHasError || rotationDuplicate || isAutoScheduleBlocked(year, month)}
-          title={
+          onClick={onRunClick}
+          disabled={
+            running ||
+            leaveHasError ||
+            rotationDuplicate ||
+            !!result?.auto_locked ||
             isAutoScheduleBlocked(year, month)
-              ? "이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요."
-              : ""
+          }
+          title={
+            result?.auto_locked
+              ? "자동배치가 잠겨 있습니다. 오른쪽 “잠금 해제”를 누르면 실행할 수 있어요."
+              : isAutoScheduleBlocked(year, month)
+                ? "이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요."
+                : ""
           }
           className="rounded bg-primary hover:bg-primary-dark px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
@@ -513,6 +551,21 @@ export default function SchedulePage() {
             {sharing ? "공개 중…" : "직원에게 공개"}
           </button>
         )}
+        {result?.saved && (
+          <button
+            onClick={handleToggleLock}
+            disabled={locking}
+            title="잠그면 이 달은 자동배치를 실행할 수 없어요 (실수로 덮어쓰기 방지). 수동 수정·공개는 그대로 가능합니다."
+            className={
+              "rounded border px-4 py-2 text-sm font-medium disabled:opacity-50 " +
+              (result.auto_locked
+                ? "border-amber-400 bg-amber-50 text-amber-800"
+                : "border-gray-300")
+            }
+          >
+            {locking ? "변경 중…" : result.auto_locked ? "자동배치 잠금 해제" : "자동배치 잠금"}
+          </button>
+        )}
         {result?.saved && result.status === "confirmed" && (
           <button
             onClick={handleDownloadImage}
@@ -522,6 +575,11 @@ export default function SchedulePage() {
           >
             {downloading ? "생성 중…" : "이미지 다운로드"}
           </button>
+        )}
+        {result?.saved && result.auto_locked && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+            자동배치 잠김
+          </span>
         )}
         {result?.saved && (
           <span
@@ -555,6 +613,47 @@ export default function SchedulePage() {
         )}
         </div>
       </div>
+
+      {confirmRun && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setConfirmRun(false)}
+          onKeyDown={(e) => e.key === "Escape" && setConfirmRun(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-2 text-base font-semibold">자동배치를 다시 실행할까요?</h2>
+            <p className="text-sm text-gray-800">
+              이미 직원에게 공개된 스케줄이 있습니다. 계속 진행하시겠습니까?
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              실행하면 새로 계산한 근무표로 바뀌고, 수정한 내용은 덮어써집니다. 다시 “직원에게
+              공개”를 누르기 전까지 직원에게는 보이지 않아요.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setConfirmRun(false)}
+                className="rounded border border-gray-300 px-4 py-2 text-sm font-medium"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleRun}
+                className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+              >
+                계속 진행
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isAutoScheduleBlocked(year, month) && (
         <p className="mb-4 text-sm text-amber-700">

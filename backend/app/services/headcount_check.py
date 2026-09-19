@@ -3,6 +3,7 @@
 자동배치 직후에는 엔진이 경고를 만들어 주지만, 저장된 근무표를 다시 열거나 표의 칸을
 직접 고친 뒤에는 엔진이 안 돌기 때문에 여기서 같은 기준(포지션 x 시간대 필요인원,
 하루 총원 상한 = max(필요인원 합, 하루 총 출근 인원 목표))으로 다시 센다.
+관리 책임자(사장님·점장) 최소 1인 출근 규칙도 같이 확인한다.
 """
 
 from datetime import date
@@ -30,9 +31,11 @@ def check_headcount(
     part_time_position: dict[int, str],
     requirements: dict[int, dict[str, dict[str, int]]],
     daily_headcount_target: int = 0,
+    manager_group_ids: set[int] | None = None,
 ) -> list[ScheduleWarningOut]:
     """part_time_position: 파트타임 직원 id -> 포지션(hall/kitchen/both). 풀오마는 그 포지션
-    모든 슬롯을 커버하는 것으로 센다 (both 는 홀로 취급)."""
+    모든 슬롯을 커버하는 것으로 센다 (both 는 홀로 취급).
+    manager_group_ids: 사장님·점장 id. 이 중 아무도 출근하지 않는 날은 경고한다."""
     if not any(
         c in _WORK_CODES for cells in cells_by_staff.values() for c in cells.values()
     ):
@@ -56,6 +59,19 @@ def check_headcount(
                     counts[(pos, slot)] += 1
             else:
                 counts[_CODE_SLOT[code]] += 1
+
+        if manager_group_ids and not any(
+            cells_by_staff.get(sid, {}).get(day) in _WORK_CODES for sid in manager_group_ids
+        ):
+            out.append(
+                ScheduleWarningOut(
+                    date=day,
+                    position="관리책임자",
+                    needed=1,
+                    filled=0,
+                    message=f"{day}: 사장님·점장이 모두 쉽니다 — 관리 책임자가 최소 1명은 출근해야 합니다",
+                )
+            )
 
         day_req_sum = 0
         for pos in _POS_LABEL:

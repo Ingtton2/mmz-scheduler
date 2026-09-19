@@ -27,6 +27,10 @@ class LeavePlanRow(BaseModel):
     max_days: float    # 이번 달에 지정할 수 있는 최대 개수 = 잔여 + 이 달 저장분 (다시 돌리면 되돌려지므로)
 
 
+class AutoLockRequest(BaseModel):
+    locked: bool
+
+
 class ScheduleWarningOut(BaseModel):
     date: str
     position: str
@@ -71,6 +75,7 @@ class ScheduleResult(BaseModel):
     status: str = "draft"       # "draft"(임시) / "confirmed"(공유됨) — 직원 노출 여부를 가름
     share_code: str | None = None
     published_at: datetime | None = None  # 직원에게 공개(공유)한 시각. 재공유 때마다 갱신.
+    auto_locked: bool = False   # True 면 이 달은 자동배치 실행이 잠겨 있음
     generated_at: datetime | None = None
 
 

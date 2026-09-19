@@ -25,6 +25,8 @@ class Schedule(SQLModel, table=True):
     edited: bool = False                     # 자동배치 후 사장님이 수동 수정했는지
     share_code: str | None = Field(default=None, unique=True, index=True)  # QR URL 용 고유코드
     published_at: datetime | None = None     # 직원에게 공개(공유)한 시각. 재공유 때마다 최신 시각으로 갱신.
+    # True 면 이 달은 자동배치 실행을 서버가 거절한다 (실수로 덮어쓰기 방지). 수동 수정·공유는 그대로 가능.
+    auto_locked: bool = False
     created_at: datetime = Field(default_factory=utcnow)
 
 

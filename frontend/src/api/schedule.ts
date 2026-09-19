@@ -45,6 +45,7 @@ export interface ScheduleResult {
   status: "draft" | "confirmed";
   share_code: string | null;
   published_at: string | null; // 직원에게 공개(공유)한 시각. 재공유 때마다 갱신.
+  auto_locked: boolean; // true 면 이 달은 자동배치 실행이 잠겨 있음 (서버가 거절)
   generated_at: string | null;
 }
 
@@ -89,6 +90,10 @@ export interface LeavePlanRow {
 
 export const getLeavePlan = (year: number, month: number) =>
   apiGet<LeavePlanRow[]>(`/schedule/leave-plan?year=${year}&month=${month}`);
+
+// 이 달 자동배치 실행 잠금/해제 (저장된 근무표가 있는 달만)
+export const setAutoLock = (year: number, month: number, locked: boolean) =>
+  apiSend<ScheduleResult>("PUT", `/schedule/${year}/${month}/auto-lock`, { locked });
 
 export const editScheduleEntries = (
   year: number,

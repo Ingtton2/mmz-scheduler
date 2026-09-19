@@ -179,7 +179,7 @@ def _ensure_dayoff_request_columns() -> None:
 
 
 def _ensure_schedule_columns() -> None:
-    """`published_at`(직원에게 공개한 시각) 컬럼을 새로 추가한다."""
+    """`published_at`(직원에게 공개한 시각)·`auto_locked`(자동배치 잠금) 컬럼을 새로 추가한다."""
     with engine.begin() as conn:
         if _is_sqlite:
             cols = {
@@ -198,6 +198,8 @@ def _ensure_schedule_columns() -> None:
             }
         if "published_at" not in cols:
             conn.execute(text("ALTER TABLE schedule ADD COLUMN published_at TIMESTAMP"))
+        if "auto_locked" not in cols:
+            conn.execute(text("ALTER TABLE schedule ADD COLUMN auto_locked BOOLEAN DEFAULT FALSE"))
 
 
 def init_db() -> None:

@@ -38,6 +38,7 @@ from app.services.schedule_summary import summarize as _summarize
 from app.services.schedule_window import can_manual_edit, can_run_auto_schedule
 from app.schemas.schedule import (
     VALID_CODES,
+    AutoLockRequest,
     AutoScheduleRequest,
     ManualEditRequest,
     ScheduleResult,
@@ -301,6 +302,18 @@ def run_auto_schedule(
             status_code=400,
             detail="이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요.",
         )
+    existing = session.exec(
+        select(Schedule).where(
+            Schedule.store_id == DEFAULT_STORE_ID,
+            Schedule.year == payload.year,
+            Schedule.month == payload.month,
+        )
+    ).first()
+    if existing is not None and existing.auto_locked:
+        raise HTTPException(
+            status_code=423,
+            detail="이 달 근무표는 자동배치가 잠겨 있습니다. 잠금을 해제한 뒤 실행해 주세요.",
+        )
 
     staff_rows = _load_active_staff(session)
     mdo = _load_min_days_off(session)
@@ -380,6 +393,7 @@ def run_auto_schedule(
         status=sched.status,
         share_code=sched.share_code,
         published_at=sched.published_at,
+        auto_locked=sched.auto_locked,
         generated_at=utcnow(),
     )
 
@@ -422,6 +436,7 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
         {s.id: s.position for s in staff_rows if s.employment_type == "part_time"},
         _load_requirements(session),
         _load_daily_headcount_target(session),
+        {s.id for s in staff_rows if s.role in ("owner", "manager")},
     )
 
     rows = [
@@ -448,6 +463,7 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
         status=sched.status,
         share_code=sched.share_code,
         published_at=sched.published_at,
+        auto_locked=sched.auto_locked,
         generated_at=sched.created_at,
     )
 
@@ -514,6 +530,21 @@ def edit_entries(
         # 공유된 뒤에 또 수정하면 다시 "임시"로 — 사장님이 다시 공유해야 직원에게 보임.
         sched.status = "draft"
         session.add(sched)
+    session.commit()
+    return _saved_result(session, sched)
+
+
+@router.put("/{year}/{month}/auto-lock", response_model=ScheduleResult)
+def set_auto_lock(
+    year: int,
+    month: int,
+    payload: AutoLockRequest,
+    session: Session = Depends(get_session),
+) -> ScheduleResult:
+    """이 달 자동배치 실행을 잠그거나 푼다. 잠금은 저장된 근무표가 있는 달에만 걸 수 있다."""
+    sched = _get_sched(session, year, month)
+    sched.auto_locked = payload.locked
+    session.add(sched)
     session.commit()
     return _saved_result(session, sched)
 
