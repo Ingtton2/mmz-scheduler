@@ -288,6 +288,8 @@ export default function SchedulePage() {
       });
       const r = await editScheduleEntries(year, month, changes);
       setResult(r);
+      // 표에서 연차 칸을 바꾸면 사용연차가 같이 가감되므로 잔여연차도 다시 불러온다
+      getLeavePlan(year, month).then(setLeavePlan).catch(() => {});
       setEdits({});
       setError("");
     } catch (e) {

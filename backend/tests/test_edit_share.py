@@ -18,10 +18,12 @@ def _fixed_today(monkeypatch):
 
 def _setup(client: TestClient) -> None:
     for nm, pos in [("홀A", "hall"), ("겸A", "both"), ("주1", "kitchen"), ("주2", "kitchen")]:
-        client.post(
+        sid = client.post(
             "/api/staff",
             json={"name": nm, "employment_type": "full_time", "position": pos, "role": "staff"},
-        )
+        ).json()["id"]
+        # 표에서 "연차"로 바꾸면 사용연차가 차감되므로 잔여연차를 미리 부여해 둔다
+        client.post("/api/leave/grants", json={"staff_id": sid, "days": 5})
     items = []
     for wd in range(7):
         items += [

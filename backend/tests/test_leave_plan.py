@@ -117,3 +117,48 @@ def test_leave_plan_endpoint_and_usage_log(client: TestClient, monkeypatch):
     u = next(x for x in usage if x["staff_id"] == ids["주1"])
     assert u["days"] == 2 and u["remaining_after"] == 3
     assert u["year_month"] == "2026-10" and len(u["dates"]) == 2
+
+
+# --- 표에서 수기로 연차 칸을 바꾸는 경우 ---
+
+
+def _edit(client: TestClient, sid: int, day: str, code: str):
+    return client.patch(
+        "/api/schedule/entries",
+        json={"year": 2026, "month": 10, "changes": [{"staff_id": sid, "work_date": day, "work_code": code}]},
+    )
+
+
+def test_manual_leave_cell_deducts_and_refunds_balance(client: TestClient, monkeypatch):
+    ids = _setup(client, monkeypatch)
+    _run(client, {})  # 연차 없이 배치만
+    sid = ids["주1"]
+
+    assert _edit(client, sid, "2026-10-14", "연차").status_code == 200
+    s = _staff(client, sid)
+    assert s["leave"]["used"] == 1 and s["leave"]["remaining"] == 4
+
+    # 같은 칸을 다시 "연차"로 저장해도 중복 차감되지 않음
+    _edit(client, sid, "2026-10-14", "연차")
+    assert _staff(client, sid)["leave"]["used"] == 1
+
+    # 연차를 다른 코드로 되돌리면 환급
+    assert _edit(client, sid, "2026-10-14", "D/O").status_code == 200
+    assert _staff(client, sid)["leave"]["used"] == 0
+
+
+def test_manual_leave_rejected_when_balance_short(client: TestClient, monkeypatch):
+    ids = _setup(client, monkeypatch)
+    _run(client, {})
+    res = _edit(client, ids["주2"], "2026-10-14", "연차")  # 주2는 부여연차 0
+    assert res.status_code == 422
+    assert "잔여연차" in res.json()["detail"]
+    assert _staff(client, ids["주2"])["leave"]["used"] == 0
+
+
+def test_manual_leave_shows_in_usage_log(client: TestClient, monkeypatch):
+    ids = _setup(client, monkeypatch)
+    _run(client, {})
+    _edit(client, ids["주1"], "2026-10-14", "연차")
+    u = next(x for x in client.get("/api/leave/usage-log").json() if x["staff_id"] == ids["주1"])
+    assert u["days"] == 1 and u["dates"] == ["2026-10-14"] and u["remaining_after"] == 4

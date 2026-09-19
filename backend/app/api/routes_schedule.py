@@ -242,6 +242,32 @@ def _apply_leave_plan(
         session.add(plan)
 
 
+def _adjust_leave(session: Session, s: Staff, year: int, month: int, delta: int) -> None:
+    """표에서 수기로 연차 칸을 늘리거나(+) 줄였을 때(-) 사용연차와 그 달 기록을 같이 조정한다.
+    늘릴 때 잔여연차가 모자라면 422."""
+    bal = _balance_of(session, s.id)
+    if bal is None:
+        bal = LeaveBalance(store_id=DEFAULT_STORE_ID, staff_id=s.id)
+    if delta > 0 and delta > bal.granted - bal.used:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{s.name}: 잔여연차({bal.granted - bal.used:g}개)가 부족해서 연차를 더 넣을 수 없습니다.",
+        )
+    bal.used = round(max(0.0, bal.used + delta), 2)
+    session.add(bal)
+
+    plan = _plan_of(session, s.id, year, month)
+    if plan is None:
+        plan = MonthlyLeavePlan(
+            store_id=DEFAULT_STORE_ID, staff_id=s.id, year=year, month=month,
+            days=0, remaining_after=0.0,
+        )
+    plan.days = max(0, plan.days + delta)
+    plan.remaining_after = round(bal.granted - bal.used, 2)
+    plan.applied_at = date.today()
+    session.add(plan)
+
+
 @router.get("/leave-plan", response_model=list[LeavePlanRow])
 def get_leave_plan(
     year: int = Query(ge=2000, le=2100),
@@ -441,6 +467,8 @@ def edit_entries(
             status_code=400, detail="이전 달 스케줄은 더 이상 수정할 수 없습니다."
         )
     sched = _get_sched(session, payload.year, payload.month)
+    staff_by_id = {s.id: s for s in _load_active_staff(session)}
+    leave_delta: dict[int, int] = {}  # 직원 id -> 이번 수정으로 늘거나 줄어든 연차 칸 수
 
     for ch in payload.changes:
         if ch.work_code not in VALID_CODES:
@@ -454,6 +482,7 @@ def edit_entries(
                 ScheduleEntry.work_date == ch.work_date,
             )
         ).first()
+        old_code = row.work_code if row is not None else None
         if row is None:
             row = ScheduleEntry(
                 schedule_id=sched.id,
@@ -464,6 +493,17 @@ def edit_entries(
         else:
             row.work_code = ch.work_code
         session.add(row)
+        # 표에서 직접 "연차"로 바꾸거나 연차를 다른 코드로 되돌리면 사용연차도 같이 가감한다
+        leave_delta[ch.staff_id] = (
+            leave_delta.get(ch.staff_id, 0)
+            + int(ch.work_code == "연차")
+            - int(old_code == "연차")
+        )
+
+    for sid, delta in leave_delta.items():
+        s = staff_by_id.get(sid)
+        if delta != 0 and s is not None and _leave_eligible(s):
+            _adjust_leave(session, s, payload.year, payload.month, delta)
 
     if payload.changes:
         sched.edited = True
