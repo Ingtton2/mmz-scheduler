@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { getMyHolidays, getMySchedule, type MyScheduleResult } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
-import { todayKst } from "../../utils/month";
+import { canGoPrevMonth, todayKst } from "../../utils/month";
 import { CELL } from "../SchedulePage";
 import MeNav from "./MeNav";
 
@@ -72,7 +72,8 @@ export default function MySchedulePage() {
       <div className="mb-4 flex items-center gap-2">
         <button
           onClick={() => setYm(shift(year, month, -1))}
-          className="rounded border px-2 py-1 text-sm hover:bg-gray-50"
+          disabled={!canGoPrevMonth(year, month)}
+          className="rounded border px-2 py-1 text-sm hover:bg-gray-50 disabled:cursor-default disabled:text-gray-300 disabled:hover:bg-transparent"
         >
           ← 이전달
         </button>

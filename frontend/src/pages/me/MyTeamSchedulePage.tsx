@@ -5,6 +5,7 @@ import { getMe, getMyHolidays, getMyTeamSchedule, type MeInfo } from "../../api/
 import { MeApiError } from "../../api/meClient";
 import { ScheduleGrid, ScheduleLegend } from "../../components/ScheduleGrid";
 import type { PublicScheduleResult } from "../../api/public";
+import { canGoPrevMonth } from "../../utils/month";
 import MeNav from "./MeNav";
 
 function thisYm(): { year: number; month: number } {
@@ -58,7 +59,8 @@ export default function MyTeamSchedulePage() {
       <div className="mb-4 flex items-center gap-2">
         <button
           onClick={() => setYm(shift(year, month, -1))}
-          className="rounded border px-2 py-1 text-sm hover:bg-gray-50"
+          disabled={!canGoPrevMonth(year, month)}
+          className="rounded border px-2 py-1 text-sm hover:bg-gray-50 disabled:cursor-default disabled:text-gray-300 disabled:hover:bg-transparent"
         >
           ← 이전달
         </button>

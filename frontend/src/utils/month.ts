@@ -60,3 +60,9 @@ export function todayKst(now: Date = new Date()): { year: number; month: number;
   const pad = (n: number) => String(n).padStart(2, "0");
   return { year, month, iso: `${year}-${pad(month)}-${pad(day)}` };
 }
+
+// 서비스 시작 달 — 직원 화면의 월 이동은 이 달보다 이전으로 갈 수 없다.
+export const SERVICE_START = { year: 2026, month: 9 };
+
+export const canGoPrevMonth = (year: number, month: number): boolean =>
+  year * 12 + month > SERVICE_START.year * 12 + SERVICE_START.month;
