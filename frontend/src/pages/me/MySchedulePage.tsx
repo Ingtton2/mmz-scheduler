@@ -29,6 +29,9 @@ function calendarCells(year: number, month: number): (string | null)[] {
   return cells;
 }
 
+// 달력 칸은 넓어서 관리자 표(좁은 칸)보다 뱃지 글자를 풀어서 쓴다. 여기 없는 코드는 CELL 의 짧은 글자 그대로.
+const BADGE_TEXT: Record<string, string> = { "D/O": "휴무", 연차: "연차", 사휴: "사휴" };
+
 const wdColor = (wd: number) =>
   wd === 0 ? "text-red-500" : wd === 6 ? "text-blue-500" : "text-gray-700";
 
@@ -132,7 +135,7 @@ export default function MySchedulePage() {
                         (isToday
                           ? "bg-[#B08968] font-semibold text-white"
                           : holidayName
-                            ? "font-semibold text-rose-700"
+                            ? wdColor(0)
                             : wdColor(wd))
                       }
                     >
@@ -145,13 +148,13 @@ export default function MySchedulePage() {
                           (meta?.cls ?? "bg-gray-100 text-gray-600")
                         }
                       >
-                        {meta?.short ?? code}
+                        {BADGE_TEXT[code] ?? meta?.short ?? code}
                       </span>
                     ) : (
                       <span className="text-xs text-gray-300">—</span>
                     )}
                     {holidayName && (
-                      <span className="line-clamp-2 px-0.5 text-center text-[8px] leading-tight break-all text-rose-600">
+                      <span className="line-clamp-2 px-0.5 text-center text-[8px] leading-tight break-all text-red-500">
                         {holidayName}
                       </span>
                     )}
