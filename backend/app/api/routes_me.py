@@ -8,15 +8,15 @@ Authorization: Bearer <직원 토큰> 을 직접 검증한다.
   GET    /api/me                        내 정보 (+ 정직원·점장은 연차 잔액 포함)
   POST   /api/me/change-pin             PIN 변경
   GET    /api/me/leave-requests         내 연차 신청 목록
-  POST   /api/me/leave-requests         내 연차 신청 (다음달만, 20일까지 — 스펙 9-5)
+  POST   /api/me/leave-requests         내 연차 신청 (다음달만, 20일 17시까지 — 스펙 9-5)
   DELETE /api/me/leave-requests/{id}    내 연차 신청 취소 (대기 중인 것만)
   GET    /api/me/dayoff-requests        내 사전휴무 신청 목록
-  POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일까지, 월 20일 한도)
+  POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일 17시까지, 월 20일 한도)
   GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
   GET  /api/me/team-schedule/{year}/{month}  이번 달 전체 직원 스케줄 (공유된 것만)
 """
 
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlmodel import Session, select
@@ -41,16 +41,21 @@ from app.schemas.staff_account import ChangePinRequest, MeOut
 from app.services import pin as pin_service
 from app.services import staff_tokens
 from app.services.date_overlap import days_by_month, overlaps
-from app.services.request_window import check_window
+from app.services.request_window import check_window, kst_now
 from app.services.schedule_summary import summarize
 from app.services.schedule_view import build_public_view, get_confirmed_schedule
 
 router = APIRouter(prefix="/me", tags=["me"])
 
 
+def _now() -> datetime:
+    """한국시간 현재 시각 (서버는 UTC 라서 마감 판단은 KST 로 한다)."""
+    return kst_now()
+
+
 def _today() -> date:
-    """테스트에서 monkeypatch 하기 쉽게 date.today() 를 함수로 감싼다."""
-    return date.today()
+    """테스트에서 monkeypatch 하기 쉽게 오늘 날짜(KST)를 함수로 감싼다."""
+    return _now().date()
 
 
 def get_current_staff(
@@ -186,7 +191,7 @@ def create_my_dayoff(
 ) -> MyDayOffRequestOut:
     _check_not_part_time(staff, "사전 휴무 신청")
     try:
-        check_window(payload.start_date, payload.end_date, _today())
+        check_window(payload.start_date, payload.end_date, _today(), _now().time())
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 

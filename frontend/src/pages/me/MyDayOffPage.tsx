@@ -1,4 +1,4 @@
-// 내 사전 휴무 신청 (스펙 9-4, 9-5). 다음 달 스케줄분만, 이번 달 20일까지.
+// 내 사전 휴무 신청 (스펙 9-4, 9-5). 다음 달 스케줄분만, 이번 달 20일 17시까지.
 import { useEffect, useState } from "react";
 import { createMyDayOff, getMe, listMyDayOff, type MeInfo, type MyRequest } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
@@ -77,12 +77,12 @@ export default function MyDayOffPage() {
         </p>
       ) : !windowOpen ? (
         <p className="mb-4 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          이번 달 셀프 신청 기간(20일)이 지났습니다. 사장님께 말씀해서 관리자
+          이번 달 셀프 신청 기간(20일 17시)이 지났습니다. 사장님께 말씀해서 관리자
           화면에서 등록해 주세요.
         </p>
       ) : (
         <p className="mb-4 rounded bg-gray-50 px-3 py-2 text-xs text-gray-500">
-          지금 신청 가능: <b>{ymLabel(targetYm)}</b> 스케줄분 (이번 달 20일까지)
+          지금 신청 가능: <b>{ymLabel(targetYm)}</b> 스케줄분 (이번 달 20일 17시까지)
         </p>
       )}
 

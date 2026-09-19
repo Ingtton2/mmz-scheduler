@@ -25,16 +25,31 @@ export function rangeOverlapsMonth(start: string, end: string, ym: string): bool
 }
 
 // --- 직원 셀프서비스 신청 가능 기간 (스펙 9-5) ------------------------------
-// 백엔드 app/services/request_window.py 와 같은 규칙: 이번 달 20일까지,
+// 백엔드 app/services/request_window.py 와 같은 규칙: 이번 달 20일 17시(한국시간)까지,
 // "다음 달" 스케줄에 대해서만 신청 가능. 여기 값은 화면 안내용이고,
 // 실제 허용 여부는 서버가 다시 검사한다.
 export const SELF_SERVICE_CUTOFF_DAY = 20;
+export const SELF_SERVICE_CUTOFF_HOUR = 17;
+
+// 기기 시간대와 상관없이 한국시간(UTC+9, 서머타임 없음) 기준의 날짜/시각.
+function kstParts(now: Date) {
+  const k = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    year: k.getUTCFullYear(),
+    month: k.getUTCMonth() + 1,
+    day: k.getUTCDate(),
+    hour: k.getUTCHours(),
+  };
+}
 
 export function selfServiceWindowOpen(today: Date = new Date()): boolean {
-  return today.getDate() <= SELF_SERVICE_CUTOFF_DAY;
+  const { day, hour } = kstParts(today);
+  if (day !== SELF_SERVICE_CUTOFF_DAY) return day < SELF_SERVICE_CUTOFF_DAY;
+  return hour < SELF_SERVICE_CUTOFF_HOUR;
 }
 
 // "다음 달"을 ym 문자열로.
 export function selfServiceTargetYm(today: Date = new Date()): string {
-  return shiftYm(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`, 1);
+  const { year, month } = kstParts(today);
+  return shiftYm(`${year}-${String(month).padStart(2, "0")}`, 1);
 }
