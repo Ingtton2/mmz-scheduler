@@ -49,10 +49,12 @@ export function ScheduleGrid({
   days,
   rows,
   highlightName,
+  holidays = {},
 }: {
   days: string[];
   rows: GridRow[];
   highlightName?: string;
+  holidays?: Record<string, string>; // 날짜 -> 공휴일 이름 (표시 전용)
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-white">
@@ -65,16 +67,27 @@ export function ScheduleGrid({
             {days.map((d) => {
               const wd = parseWd(d);
               const weekend = wd === 0 || wd === 6;
+              const holidayName = holidays[d];
               return (
                 <th
                   key={d}
+                  title={holidayName}
                   className={
                     "w-8 px-0 py-1 text-center font-medium " +
-                    (weekend ? "bg-amber-50 text-amber-700" : "")
+                    (holidayName
+                      ? "bg-rose-50 text-rose-700"
+                      : weekend
+                        ? "bg-amber-50 text-amber-700"
+                        : "")
                   }
                 >
                   <div>{Number(d.split("-")[2])}</div>
                   <div className="text-[10px] text-gray-400">{WD_CHAR[wd]}</div>
+                  {holidayName && (
+                    <div className="line-clamp-2 px-0.5 text-[7px] leading-tight break-all text-rose-600">
+                      {holidayName}
+                    </div>
+                  )}
                 </th>
               );
             })}

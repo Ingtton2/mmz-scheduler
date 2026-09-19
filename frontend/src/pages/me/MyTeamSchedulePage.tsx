@@ -1,7 +1,7 @@
 // 이번 달 전체 직원 스케줄 (스펙 9-4 확장) — 동료 근무일 확인, 대타 부탁용.
 // 공유(confirmed)된 스케줄만 보인다. 본인 이름은 자동으로 강조됨.
 import { useEffect, useState } from "react";
-import { getMe, getMyTeamSchedule, type MeInfo } from "../../api/me";
+import { getMe, getMyHolidays, getMyTeamSchedule, type MeInfo } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
 import { ScheduleGrid, ScheduleLegend } from "../../components/ScheduleGrid";
 import type { PublicScheduleResult } from "../../api/public";
@@ -23,10 +23,15 @@ export default function MyTeamSchedulePage() {
   const [data, setData] = useState<PublicScheduleResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // 공휴일(날짜 -> 이름). 표시 전용이라 못 불러와도 표는 그대로 보여준다.
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
 
   useEffect(() => {
     getMe()
       .then(setMe)
+      .catch(() => {});
+    getMyHolidays()
+      .then((list) => setHolidays(Object.fromEntries(list.map((h) => [h.date, h.name]))))
       .catch(() => {});
   }, []);
 
@@ -77,7 +82,12 @@ export default function MyTeamSchedulePage() {
       ) : (
         <>
           <ScheduleLegend />
-          <ScheduleGrid days={data.days} rows={data.rows} highlightName={me?.name} />
+          <ScheduleGrid
+            days={data.days}
+            rows={data.rows}
+            highlightName={me?.name}
+            holidays={holidays}
+          />
         </>
       )}
     </div>
