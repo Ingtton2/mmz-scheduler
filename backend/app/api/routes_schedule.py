@@ -33,6 +33,7 @@ from app.models import (
 from app.models.base import date_range, utcnow
 from app.scheduler.engine import SolveInput, StaffInput, build_schedule
 from app.schemas.staff import has_leave_balance
+from app.services.headcount_check import check_headcount
 from app.services.schedule_summary import summarize as _summarize
 from app.services.schedule_window import can_manual_edit, can_run_auto_schedule
 from app.schemas.schedule import (
@@ -384,6 +385,15 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
     last_day = calendar.monthrange(sched.year, sched.month)[1]
     days = [date(sched.year, sched.month, d).isoformat() for d in range(1, last_day + 1)]
 
+    # 엔진을 다시 돌리지 않는 경우(다시 열기/수동 수정)에도 인원 부족·초과 경고를 다시 계산
+    warnings = check_headcount(
+        days,
+        {s.id: cells_by_staff.get(s.id, {}) for s in staff_rows},
+        {s.id: s.position for s in staff_rows if s.employment_type == "part_time"},
+        _load_requirements(session),
+        _load_daily_headcount_target(session),
+    )
+
     rows = [
         ScheduleStaffRow(
             staff_id=s.id,
@@ -401,8 +411,8 @@ def _saved_result(session: Session, sched: Schedule) -> ScheduleResult:
         month=sched.month,
         days=days,
         rows=rows,
-        warnings=[],
-        feasible=True,
+        warnings=warnings,
+        feasible=not warnings,
         saved=True,
         edited=sched.edited,
         status=sched.status,

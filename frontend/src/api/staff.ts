@@ -26,6 +26,8 @@ export interface Staff {
   fixed_schedule: boolean; // 근무 가능 요일에 항상 배치
   is_active: boolean;
   hire_date: string | null; // "YYYY-MM-DD"
+  kitchen_rotation: boolean; // 주방 오픈/미들/마감 3인 월별 로테이션 대상
+  close_backup: boolean; // 점장이 쉬는 날 주방 마감을 우선 채우는 백업
   created_at: string;
   leave: LeaveBalance | null; // 정직원만
 }
@@ -38,6 +40,8 @@ export interface StaffCreate {
   work_weekdays: number[];
   fixed_schedule: boolean;
   hire_date?: string | null;
+  kitchen_rotation?: boolean;
+  close_backup?: boolean;
   leave: LeaveBalanceInput;
 }
 
@@ -49,6 +53,8 @@ export interface StaffUpdate {
   work_weekdays?: number[];
   fixed_schedule?: boolean;
   hire_date?: string | null;
+  kitchen_rotation?: boolean;
+  close_backup?: boolean;
 }
 
 export const listStaff = () => apiGet<Staff[]>("/staff");

@@ -8,6 +8,13 @@ import { Link } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { getHolidays } from "../api/holiday";
 import {
+  getRotation,
+  saveRotation,
+  SLOT_LABEL,
+  type RotationItem,
+  type RotationSlot,
+} from "../api/kitchenRotation";
+import {
   EDIT_CODES,
   editScheduleEntries,
   getLeavePlan,
@@ -105,6 +112,10 @@ export default function SchedulePage() {
   // 직원별 "이번 달 연차 사용 개수" 입력 (자동배치가 날짜를 랜덤으로 골라 넣음)
   const [leavePlan, setLeavePlan] = useState<LeavePlanRow[]>([]);
   const [leaveInputs, setLeaveInputs] = useState<Record<number, string>>({});
+  // 이번 달 주방 로테이션(전월 기준 자동 계산). 사장님이 실행 전에 확인하고 바꿀 수 있음.
+  const [rotation, setRotation] = useState<RotationItem[]>([]);
+  const [rotationSaved, setRotationSaved] = useState(false);
+  const [rotationEdited, setRotationEdited] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -179,6 +190,31 @@ export default function SchedulePage() {
     };
   }, [year, month]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getRotation(year, month)
+      .then((p) => {
+        if (cancelled) return;
+        setRotation(p.items);
+        setRotationSaved(p.saved);
+        setRotationEdited(false);
+      })
+      .catch(() => {
+        if (!cancelled) setRotation([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [year, month]);
+
+  function setRotationSlot(staffId: number, slot: RotationSlot) {
+    setRotation((prev) => prev.map((r) => (r.staff_id === staffId ? { ...r, position: slot } : r)));
+    setRotationEdited(true);
+  }
+  // 오픈/미들/마감을 한 명씩 맡아야 함 (겹치면 로테이션이 어긋남)
+  const rotationDuplicate =
+    rotation.length > 0 && new Set(rotation.map((r) => r.position)).size !== rotation.length;
+
   // 입력값 -> 개수. 비었으면 0, 음수/소수/잔여 초과면 오류 메시지.
   function leaveInputError(r: LeavePlanRow): string {
     const raw = (leaveInputs[r.staff_id] ?? "").trim();
@@ -199,7 +235,22 @@ export default function SchedulePage() {
     setRunning(true);
     resetTransient();
     try {
+      if (rotationEdited && rotation.length > 0) {
+        // 사장님이 고친 로테이션을 먼저 저장 — 자동배치가 이 값을 우선 배정 기준으로 씀
+        await saveRotation(
+          year,
+          month,
+          rotation.map((r) => ({ staff_id: r.staff_id, position: r.position })),
+        );
+      }
       setResult(await runAutoSchedule(year, month, leaveDays));
+      getRotation(year, month)
+        .then((p) => {
+          setRotation(p.items);
+          setRotationSaved(p.saved);
+          setRotationEdited(false);
+        })
+        .catch(() => {});
       // 실행하면 사용연차가 차감되므로 잔여/저장 개수를 다시 불러온다
       getLeavePlan(year, month).then(setLeavePlan).catch(() => {});
       setError("");
@@ -396,10 +447,51 @@ export default function SchedulePage() {
           </div>
         )}
 
+        {/* 이번 달 주방 로테이션: 전월 담당 기준으로 오픈→미들→마감→오픈 한 칸씩 이동 */}
+        {rotation.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex flex-wrap items-baseline gap-2">
+              <h2 className="text-sm font-semibold text-gray-700">이번 달 주방 로테이션</h2>
+              <span className="text-xs text-gray-400">
+                {rotationSaved && !rotationEdited
+                  ? "저장된 값이에요."
+                  : "전월 담당 기준으로 자동 계산한 값이에요. 바꾸면 실행할 때 저장됩니다."}{" "}
+                연차·사전휴무로 못 나오는 날만 다른 사람이 대신 채워요.
+              </span>
+            </div>
+            <ul className="flex flex-wrap gap-2">
+              {rotation.map((r) => (
+                <li
+                  key={r.staff_id}
+                  className="flex items-center gap-2 rounded border bg-gray-50 px-3 py-2"
+                >
+                  <span className="text-sm font-medium">{r.staff_name}</span>
+                  <select
+                    value={r.position}
+                    onChange={(e) => setRotationSlot(r.staff_id, e.target.value as RotationSlot)}
+                    className="rounded border border-gray-300 px-2 py-1 text-base sm:text-sm"
+                  >
+                    {(Object.keys(SLOT_LABEL) as RotationSlot[]).map((k) => (
+                      <option key={k} value={k}>
+                        {SLOT_LABEL[k]}
+                      </option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+            {rotationDuplicate && (
+              <p className="mt-1 text-xs text-red-600">
+                오픈·미들·마감을 한 명씩 겹치지 않게 골라 주세요.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-wrap items-end gap-3">
         <button
           onClick={handleRun}
-          disabled={running || leaveHasError || isAutoScheduleBlocked(year, month)}
+          disabled={running || leaveHasError || rotationDuplicate || isAutoScheduleBlocked(year, month)}
           title={
             isAutoScheduleBlocked(year, month)
               ? "이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요."
@@ -687,8 +779,8 @@ export default function SchedulePage() {
             </table>
           </div>
           <p className="mt-2 text-xs text-gray-400">
-            칸을 클릭하면 근무 코드를 바꿀 수 있습니다. 수정본에는 자동배치
-            경고가 다시 계산되지 않습니다.
+            칸을 클릭하면 근무 코드를 바꿀 수 있습니다. 필요인원 부족·초과 경고는 저장할
+            때마다 다시 계산되고, 기본휴무·연속근무 경고는 자동배치 직후에만 나옵니다.
           </p>
 
           <ShiftDistribution rows={result.rows} />

@@ -38,6 +38,8 @@ const EMPTY_FORM = {
   work_weekdays: [0, 1, 2, 3, 4, 5, 6] as number[],
   fixed_schedule: false,
   hire_date: "",
+  kitchen_rotation: false,
+  close_backup: false,
   leave: { ...EMPTY_LEAVE },
 };
 
@@ -99,6 +101,8 @@ export default function StaffPage() {
           work_weekdays: form.work_weekdays,
           fixed_schedule: form.fixed_schedule,
           hire_date: form.hire_date || null,
+          kitchen_rotation: form.kitchen_rotation,
+          close_backup: form.close_backup,
         });
         if (showBaseOff) {
           await updateLeaveBalance(editingStaffId, form.leave);
@@ -113,6 +117,8 @@ export default function StaffPage() {
           work_weekdays: form.work_weekdays,
           fixed_schedule: form.fixed_schedule,
           hire_date: form.hire_date || null,
+          kitchen_rotation: form.kitchen_rotation,
+          close_backup: form.close_backup,
           leave: form.leave,
         });
       }
@@ -137,6 +143,8 @@ export default function StaffPage() {
       work_weekdays: s.work_weekdays,
       fixed_schedule: s.fixed_schedule,
       hire_date: s.hire_date ?? "",
+      kitchen_rotation: s.kitchen_rotation,
+      close_backup: s.close_backup,
       // 기존 연차 숫자는 그대로 보존해서 실어 보낸다 (base_off_days만 화면에서 수정).
       leave: s.leave
         ? {
@@ -318,6 +326,37 @@ export default function StaffPage() {
           </p>
         </fieldset>
 
+        {/* --- 자동배치 선호 (주방) --- */}
+        {!isOwner && (
+          <fieldset className="mt-4 rounded border border-gray-200 p-3">
+            <legend className="px-1 text-sm font-medium text-gray-600">
+              자동배치 선호 (주방)
+            </legend>
+            <div className="flex flex-col gap-1.5 text-sm text-gray-700">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={form.kitchen_rotation}
+                  onChange={(e) => setForm({ ...form, kitchen_rotation: e.target.checked })}
+                />
+                주방 로테이션 대상 — 매달 오픈→미들→마감 순으로 한 칸씩 돌아가며 맡음
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={form.close_backup}
+                  onChange={(e) => setForm({ ...form, close_backup: e.target.checked })}
+                />
+                마감 백업 — 점장이 쉬는 날 주방 마감 자리를 우선 채움
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-gray-400">
+              소프트 선호도예요. 연차·사전휴무로 못 나오는 날만 다른 사람이 대신 채웁니다. 로테이션
+              대상은 3명으로 맞춰 주세요 (이번 달 담당은 근무표 관리에서 확인·수정).
+            </p>
+          </fieldset>
+        )}
+
         {/* --- 월 최소 휴무 (정직원만, 연차와 별개) --- */}
         {showBaseOff ? (
           <fieldset className="mt-4 rounded border border-gray-200 p-3">
@@ -471,6 +510,16 @@ function StaffRow({
         >
           {s.name}
         </button>
+        {s.kitchen_rotation && (
+          <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-normal text-gray-600">
+            로테이션
+          </span>
+        )}
+        {s.close_backup && (
+          <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-normal text-gray-600">
+            마감백업
+          </span>
+        )}
       </td>
       <td className="px-3 py-2">{LABEL.role[s.role] ?? s.role}</td>
       <td className="px-3 py-2">{LABEL.position[s.position] ?? s.position}</td>
