@@ -1,4 +1,5 @@
-// 연차 관리 화면 (스펙 3) — "사전휴무 승인" + "연차 사용 현황" 탭 통합.
+// 사전휴무 관리 화면 (스펙 3) — "사전휴무 승인" + "연차 사용 현황" 탭 통합.
+//  - 사전휴무 목록은 월별 + 직원별로 필터해서 볼 수 있다.
 //  - 사전휴무 승인: 사전 휴무 신청(날짜 기반)을 승인/반려. 연차는 날짜로 신청하지 않는다 —
 //    사장님이 부여하고, 자동배치 실행 때 직원별 사용 개수를 정하면 날짜는 자동배치가 고른다.
 //  - 연차 사용 현황: 부여/사용/잔여 연차 조회 + 연차 추가.
@@ -62,6 +63,7 @@ export default function LeaveManagementPage() {
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
+  const [staffFilter, setStaffFilter] = useState("");
 
   const [form, setForm] = useState({
     staff_id: "",
@@ -89,10 +91,14 @@ export default function LeaveManagementPage() {
     )
     .sort((a, b) => a.start_date.localeCompare(b.start_date));
 
+  const staffRows = staffFilter
+    ? rows.filter((r) => r.staff_id === Number(staffFilter))
+    : rows;
+
   const visibleRows =
     monthFilter === null
-      ? rows
-      : rows.filter((r) => rangeOverlapsMonth(r.start_date, r.end_date, monthFilter));
+      ? staffRows
+      : staffRows.filter((r) => rangeOverlapsMonth(r.start_date, r.end_date, monthFilter));
 
   function setStart(v: string) {
     setForm((f) => ({
@@ -188,10 +194,10 @@ export default function LeaveManagementPage() {
           관리자 홈
         </Link>
         <span>/</span>
-        <span className="text-gray-800">연차 관리</span>
+        <span className="text-gray-800">사전휴무 관리</span>
       </div>
 
-      <h1 className="mb-4 text-xl font-bold">연차 관리</h1>
+      <h1 className="mb-4 text-xl font-bold">사전휴무 관리</h1>
 
       {/* --- 탭 --- */}
       <div className="mb-4 flex gap-1 border-b">
@@ -317,10 +323,31 @@ export default function LeaveManagementPage() {
           )}
 
           {/* --- 신청 목록 --- */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-white px-3 py-2">
+            <label htmlFor="staff-filter" className="text-sm font-medium">
+              직원별 보기
+            </label>
+            <select
+              id="staff-filter"
+              className={field}
+              value={staffFilter}
+              onChange={(e) => setStaffFilter(e.target.value)}
+            >
+              <option value="">전체 직원</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400">
+              “전체 보기”를 함께 누르면 그 직원의 전체 이력을 볼 수 있어요.
+            </span>
+          </div>
           <MonthFilterBar
             month={monthFilter}
             onChange={setMonthFilter}
-            total={rows.length}
+            total={staffRows.length}
             shown={visibleRows.length}
           />
           <div className="overflow-x-auto rounded-lg border bg-white">
@@ -345,8 +372,10 @@ export default function LeaveManagementPage() {
                 ) : visibleRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
-                      {rows.length === 0
-                        ? "아직 등록된 사전휴무 신청이 없습니다."
+                      {staffRows.length === 0
+                        ? staffFilter
+                          ? "이 직원의 사전휴무 신청이 없습니다."
+                          : "아직 등록된 사전휴무 신청이 없습니다."
                         : "이 달에는 신청 내역이 없습니다."}
                     </td>
                   </tr>
@@ -411,7 +440,7 @@ export default function LeaveManagementPage() {
           </div>
 
           <p className="mt-3 text-xs text-gray-400">
-            총 {rows.length}건 · “상태” 칸을 누르면 대기 → 승인 → 반려 순으로
+            총 {staffRows.length}건 · “상태” 칸을 누르면 대기 → 승인 → 반려 순으로
             전환됩니다. “신청일”은 실제 쉬는 날짜와 다른, 신청서를 낸 날입니다.
           </p>
         </>

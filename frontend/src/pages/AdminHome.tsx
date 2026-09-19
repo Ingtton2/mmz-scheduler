@@ -6,8 +6,8 @@ const MENU = [
   { key: "staff", label: "직원 관리", desc: "등록 · 정보 수정 · 삭제", to: "/admin/staff" },
   {
     key: "leave",
-    label: "연차 관리",
-    desc: "연차 부여 · 사용 현황 · 사전휴무 승인",
+    label: "사전휴무 관리",
+    desc: "사전 휴무 입력, 승인, 직원 연차 부여",
     to: "/admin/leave",
   },
   {
