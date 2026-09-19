@@ -7,8 +7,6 @@
   GET  /api/leave/usage-log          사용 이력 (자동배치 실행 시 기록 + 예전 승인 방식 기록, 최신순)
 """
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
@@ -17,10 +15,6 @@ from app.models import (
     DEFAULT_STORE_ID,
     LeaveBalance,
     LeaveGrantLog,
-    LeaveUsageLog,
-    MonthlyLeavePlan,
-    Schedule,
-    ScheduleEntry,
     Staff,
 )
 from app.models.base import today_kst
@@ -32,6 +26,7 @@ from app.schemas.leave_usage import (
 )
 from app.schemas.staff import has_leave_balance
 from app.services.leave_anniversary import list_grant_candidates
+from app.services.leave_usage_log import build_usage_log
 
 router = APIRouter(prefix="/leave", tags=["leave-usage"])
 
@@ -102,68 +97,4 @@ def grant_log(session: Session = Depends(get_session)) -> list[LeaveGrantRead]:
 
 @router.get("/usage-log", response_model=list[LeaveUsageLogRead])
 def usage_log(session: Session = Depends(get_session)) -> list[LeaveUsageLogRead]:
-    out: list[tuple[object, LeaveUsageLogRead]] = []
-
-    legacy = session.exec(
-        select(LeaveUsageLog, Staff)
-        .join(Staff, Staff.id == LeaveUsageLog.staff_id)
-        .where(LeaveUsageLog.store_id == DEFAULT_STORE_ID)
-    ).all()
-    for u, s in legacy:
-        out.append(
-            (
-                u.created_at,
-                LeaveUsageLogRead(
-                    id=u.id,
-                    staff_id=u.staff_id,
-                    staff_name=s.name,
-                    start_date=u.start_date,
-                    end_date=u.end_date,
-                    days=u.days,
-                    applied_at=u.applied_at,
-                    remaining_after=u.remaining_after,
-                ),
-            )
-        )
-
-    plans = session.exec(
-        select(MonthlyLeavePlan, Staff)
-        .join(Staff, Staff.id == MonthlyLeavePlan.staff_id)
-        .where(MonthlyLeavePlan.store_id == DEFAULT_STORE_ID, MonthlyLeavePlan.days > 0)
-    ).all()
-    for p, s in plans:
-        dates = sorted(
-            e.work_date
-            for e in session.exec(
-                select(ScheduleEntry)
-                .join(Schedule, Schedule.id == ScheduleEntry.schedule_id)
-                .where(
-                    Schedule.store_id == DEFAULT_STORE_ID,
-                    Schedule.year == p.year,
-                    Schedule.month == p.month,
-                    ScheduleEntry.staff_id == p.staff_id,
-                    ScheduleEntry.work_code == "연차",
-                )
-            ).all()
-        )
-        first = date(p.year, p.month, 1)
-        out.append(
-            (
-                p.created_at,
-                LeaveUsageLogRead(
-                    id=-p.id,  # 예전 이력 id 와 안 겹치게 음수
-                    staff_id=p.staff_id,
-                    staff_name=s.name,
-                    start_date=dates[0] if dates else first,
-                    end_date=dates[-1] if dates else first,
-                    days=p.days,
-                    applied_at=p.applied_at,
-                    remaining_after=p.remaining_after,
-                    year_month=f"{p.year}-{p.month:02d}",
-                    dates=dates,
-                ),
-            )
-        )
-
-    out.sort(key=lambda t: t[0], reverse=True)
-    return [row for _, row in out]
+    return build_usage_log(session)

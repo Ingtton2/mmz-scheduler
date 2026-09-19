@@ -1,31 +1,31 @@
 // 내 연차 조회. 연차는 직원이 날짜로 신청하지 않는다 — 사장님이 부여하고, 근무표를 만들 때
 // 직원별 사용 개수를 정하면 자동배치가 날짜를 골라 넣는다. 여기서는 잔여연차만 확인.
 import { useEffect, useState } from "react";
-import { getMe, listMyLeave, type MeInfo, type MyLeaveRequest } from "../../api/me";
-import { LABEL } from "../../labels";
+import {
+  getMe,
+  listMyLeaveGrants,
+  listMyLeaveUsages,
+  type MeInfo,
+} from "../../api/me";
+import type { LeaveGrant, LeaveUsageLogEntry } from "../../api/leaveUsage";
 import { fmtRange } from "../../utils/format";
 import MeNav from "./MeNav";
 
 const fmtDays = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
-const STATUS_BADGE: Record<string, string> = {
-  confirmed: "bg-mint text-mint-ink",
-  rejected: "bg-warn text-warn-ink",
-  requested: "bg-amber-100 text-amber-800",
-};
-
 export default function MyLeavePage() {
   const [me, setMe] = useState<MeInfo | null>(null);
-  const [past, setPast] = useState<MyLeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showDetail, setShowDetail] = useState(false);
+  const [grants, setGrants] = useState<LeaveGrant[]>([]);
+  const [usages, setUsages] = useState<LeaveUsageLogEntry[]>([]);
 
   useEffect(() => {
-    Promise.all([getMe(), listMyLeave()])
-      .then(([meInfo, r]) => {
+    Promise.all([getMe(), listMyLeaveGrants(), listMyLeaveUsages()])
+      .then(([meInfo, g, u]) => {
         setMe(meInfo);
-        setPast(r);
+        setGrants(g);
+        setUsages(u);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
       .finally(() => setLoading(false));
@@ -81,62 +81,98 @@ export default function MyLeavePage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowDetail((v) => !v)}
-            className="mt-3 text-xs text-gray-500 underline"
-          >
-            {showDetail ? "상세 내역 접기" : "상세 내역 보기"}
-          </button>
-
-          {showDetail && (
-            <dl className="mt-3 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-sm">
-              <dt className="text-gray-500">부여연차</dt>
-              <dd className="text-right">{fmtDays(leave.granted)}일</dd>
-              <dt className="text-gray-500">사용연차</dt>
-              <dd className="text-right">{fmtDays(leave.used)}일</dd>
-              <dt className="font-medium text-gray-700">잔여연차</dt>
-              <dd className="text-right font-medium">{fmtDays(leave.remaining)}일</dd>
-            </dl>
-          )}
+          <dl className="mt-4 grid grid-cols-2 gap-y-1.5 border-t pt-3 text-sm">
+            <dt className="text-gray-500">부여연차</dt>
+            <dd className="text-right">{fmtDays(leave.granted)}일</dd>
+            <dt className="text-gray-500">사용연차</dt>
+            <dd className="text-right">{fmtDays(leave.used)}일</dd>
+            <dt className="font-medium text-gray-700">잔여연차</dt>
+            <dd className="text-right font-medium">{fmtDays(leave.remaining)}일</dd>
+          </dl>
         </div>
       )}
 
-      {past.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">이전 신청 기록</h2>
-          <div className="overflow-x-auto rounded-lg border bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-gray-50 text-left text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">기간</th>
-                  <th className="px-3 py-2">상태</th>
-                  <th className="px-3 py-2">메모</th>
-                </tr>
-              </thead>
-              <tbody>
-                {past.map((r) => (
-                  <tr key={r.id} className="border-b last:border-0">
-                    <td className="px-3 py-2 font-medium whitespace-nowrap">
-                      {fmtRange(r.start_date, r.end_date, r.days)}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          "rounded-full px-2 py-0.5 text-xs font-semibold " +
-                          (STATUS_BADGE[r.status] ?? "bg-gray-100 text-gray-600")
-                        }
-                      >
-                        {LABEL.leaveStatus[r.status] ?? r.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
+      {leave && (
+        <>
+          <section className="mb-4">
+            <h2 className="mb-2 text-sm font-semibold text-gray-700">연차 사용 내역</h2>
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-gray-50 text-left text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">사용일</th>
+                    <th className="px-3 py-2 text-right">일수</th>
+                    <th className="px-3 py-2 text-right">사용 후 잔여</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                </thead>
+                <tbody>
+                  {usages.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
+                        아직 사용한 연차가 없어요.
+                      </td>
+                    </tr>
+                  ) : (
+                    usages.map((u) => (
+                      <tr key={u.id} className="border-b last:border-0">
+                        <td className="px-3 py-2">
+                          {u.year_month ? (
+                            <>
+                              <span className="text-xs text-gray-400">{u.year_month} 근무표</span>
+                              <div className="whitespace-nowrap">
+                                {u.dates.map((d) => d.slice(5)).join(", ") || "-"}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="whitespace-nowrap">
+                              {fmtRange(u.start_date, u.end_date, u.days)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">{fmtDays(u.days)}일</td>
+                        <td className="px-3 py-2 text-right font-semibold">
+                          {fmtDays(u.remaining_after)}일
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mb-4">
+            <h2 className="mb-2 text-sm font-semibold text-gray-700">연차 부여 내역</h2>
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-gray-50 text-left text-gray-500">
+                  <tr>
+                    <th className="px-3 py-2">부여일</th>
+                    <th className="px-3 py-2 text-right">부여일수</th>
+                    <th className="px-3 py-2">내용</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grants.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
+                        아직 부여된 연차가 없어요.
+                      </td>
+                    </tr>
+                  ) : (
+                    grants.map((g) => (
+                      <tr key={g.id} className="border-b last:border-0">
+                        <td className="px-3 py-2 whitespace-nowrap">{g.granted_at}</td>
+                        <td className="px-3 py-2 text-right">{fmtDays(g.days)}일</td>
+                        <td className="px-3 py-2 text-gray-600">{g.note ?? ""}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

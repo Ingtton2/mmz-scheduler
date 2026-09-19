@@ -11,6 +11,8 @@ Authorization: Bearer <직원 토큰> 을 직접 검증한다.
   POST   /api/me/leave-requests         내 연차 신청 (다음달만, 20일 17시까지 — 스펙 9-5)
   DELETE /api/me/leave-requests/{id}    내 연차 신청 취소 (대기 중인 것만)
   GET    /api/me/holidays               관리자가 등록한 공휴일 (달력 표시용)
+  GET    /api/me/leave-grants           내 연차 부여 이력 (최신순)
+  GET    /api/me/leave-usages           내 연차 사용 이력 (최신순)
   GET    /api/me/dayoff-requests        내 사전휴무 신청 목록
   POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일 17시까지, 월 20일 한도)
   GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
@@ -29,6 +31,7 @@ from app.models import (
     DayOffRequest,
     Holiday,
     LeaveBalance,
+    LeaveGrantLog,
     LeaveRequest,
     Schedule,
     ScheduleEntry,
@@ -37,6 +40,7 @@ from app.models import (
 )
 from app.schemas.holiday import HolidayItem
 from app.schemas.leave import LeaveBalanceRead
+from app.schemas.leave_usage import LeaveGrantRead, LeaveUsageLogRead
 from app.schemas.me import MyDayOffRequestOut, MyLeaveRequestOut, MyRequestCreate, MyScheduleResult
 from app.schemas.schedule import PublicScheduleResult
 from app.schemas.staff import has_leave_balance
@@ -44,6 +48,7 @@ from app.schemas.staff_account import ChangePinRequest, MeOut
 from app.services import pin as pin_service
 from app.services import staff_tokens
 from app.services.date_overlap import days_by_month, overlaps
+from app.services.leave_usage_log import build_usage_log
 from app.services.request_window import check_window, kst_now
 from app.services.schedule_summary import summarize
 from app.services.schedule_view import build_public_view, get_confirmed_schedule
@@ -159,6 +164,35 @@ def my_leave_requests(
         )
         for r in rows
     ]
+
+
+@router.get("/leave-grants", response_model=list[LeaveGrantRead])
+def my_leave_grants(
+    staff: Staff = Depends(get_current_staff), session: Session = Depends(get_session)
+) -> list[LeaveGrantRead]:
+    rows = session.exec(
+        select(LeaveGrantLog)
+        .where(LeaveGrantLog.staff_id == staff.id)
+        .order_by(LeaveGrantLog.granted_at.desc(), LeaveGrantLog.id.desc())
+    ).all()
+    return [
+        LeaveGrantRead(
+            id=g.id,
+            staff_id=staff.id,
+            staff_name=staff.name,
+            granted_at=g.granted_at,
+            days=g.days,
+            note=g.note,
+        )
+        for g in rows
+    ]
+
+
+@router.get("/leave-usages", response_model=list[LeaveUsageLogRead])
+def my_leave_usages(
+    staff: Staff = Depends(get_current_staff), session: Session = Depends(get_session)
+) -> list[LeaveUsageLogRead]:
+    return build_usage_log(session, staff_id=staff.id)
 
 
 # --- 사전 휴무 ------------------------------------------------------------

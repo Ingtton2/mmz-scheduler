@@ -1,6 +1,7 @@
 // 직원 셀프서비스 API (스펙 9): 가입/로그인/PIN변경/내 연차·사전휴무/내 스케줄.
 import { meGet, meSend } from "./meClient";
 import type { HolidayItem } from "./holiday";
+import type { LeaveGrant, LeaveUsageLogEntry } from "./leaveUsage";
 import type { PublicScheduleResult } from "./public";
 
 export interface AvailableStaff {
@@ -67,14 +68,6 @@ export interface MyRequest {
   created_at: string;
 }
 
-export interface MyLeaveRequest extends MyRequest {
-  applied_at: string; // 신청일 (쉬는 날짜와는 다른 값)
-  status: string;
-}
-
-export const listMyLeave = () => meGet<MyLeaveRequest[]>("/me/leave-requests");
-
-
 export const listMyDayOff = () => meGet<MyRequest[]>("/me/dayoff-requests");
 
 export const createMyDayOff = (start_date: string, end_date: string, note?: string) =>
@@ -98,3 +91,7 @@ export const getMyTeamSchedule = (year: number, month: number) =>
 
 // 관리자가 등록한 공휴일 — 내 스케줄 달력에 이름을 표시하는 용도.
 export const getMyHolidays = () => meGet<HolidayItem[]>("/me/holidays");
+
+// 내 연차 부여 이력 / 사용 이력 (최신순) — "내 연차" 화면용.
+export const listMyLeaveGrants = () => meGet<LeaveGrant[]>("/me/leave-grants");
+export const listMyLeaveUsages = () => meGet<LeaveUsageLogEntry[]>("/me/leave-usages");
