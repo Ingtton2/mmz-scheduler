@@ -15,6 +15,7 @@ import {
 } from "../api/dayoff";
 import { listStaff, type Staff } from "../api/staff";
 import { LABEL } from "../labels";
+import ConfirmDialog from "../components/ConfirmDialog";
 import MonthFilterBar from "../components/MonthFilterBar";
 import { rangeOverlapsMonth, todayYm } from "../utils/month";
 import { fmtRange } from "../utils/format";
@@ -34,6 +35,7 @@ type Row = {
   applied_at: string;
   status: Status;
   note: string | null;
+  reject_reason: string | null;
 };
 
 // 대기 -> 승인 -> 반려 -> 대기 순으로 클릭할 때마다 전환.
@@ -62,6 +64,8 @@ export default function LeaveManagementPage() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  // 반려로 넘길 때 사유를 받는 중인 신청 (사유는 필수)
+  const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
   const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
   const [staffFilter, setStaffFilter] = useState("");
 
@@ -87,6 +91,7 @@ export default function LeaveManagementPage() {
         applied_at: r.applied_at,
         status: r.status,
         note: r.note,
+        reject_reason: r.reject_reason,
       }),
     )
     .sort((a, b) => a.start_date.localeCompare(b.start_date));
@@ -164,9 +169,29 @@ export default function LeaveManagementPage() {
   }
 
   async function toggleStatus(r: Row) {
+    const next = NEXT_STATUS[r.status];
+    if (next === "rejected") {
+      // 반려는 사유를 적어야 넘어간다 — 사유 입력칸을 먼저 연다.
+      setRejecting({ id: r.id, reason: "" });
+      return;
+    }
     try {
-      const next = NEXT_STATUS[r.status];
       await updateDayOffRequest(r.id, { status: next });
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function confirmReject() {
+    if (!rejecting || !rejecting.reason.trim()) return;
+    try {
+      await updateDayOffRequest(rejecting.id, {
+        status: "rejected",
+        reject_reason: rejecting.reason.trim(),
+      });
+      setRejecting(null);
+      setError("");
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -404,33 +429,48 @@ export default function LeaveManagementPage() {
                         >
                           {LABEL.leaveStatus[r.status] ?? r.status}
                         </button>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
-                        {pendingDelete === rowKey(r) ? (
-                          <>
-                            <span className="text-xs text-gray-500">삭제할까요?</span>
+                        {r.status === "rejected" && r.reject_reason && (
+                          <div className="mt-1 max-w-[14rem] text-xs text-gray-500">
+                            사유: {r.reject_reason}
+                          </div>
+                        )}
+                        {rejecting?.id === r.id && (
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
+                            <input
+                              autoFocus
+                              value={rejecting.reason}
+                              onChange={(e) => setRejecting({ id: r.id, reason: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") confirmReject();
+                                if (e.key === "Escape") setRejecting(null);
+                              }}
+                              placeholder="반려 사유 (필수)"
+                              className="w-44 rounded border border-gray-300 px-2 py-1 text-xs"
+                            />
                             <button
-                              onClick={() => handleDelete(r)}
-                              className="ml-2 rounded bg-red-600 px-2 py-0.5 text-xs text-white"
+                              onClick={confirmReject}
+                              disabled={!rejecting.reason.trim()}
+                              className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-40"
                             >
-                              삭제
+                              반려 확정
                             </button>
                             <button
-                              onClick={() => setPendingDelete(null)}
-                              className="ml-1 text-xs text-gray-500 hover:underline"
+                              onClick={() => setRejecting(null)}
+                              className="text-xs text-gray-500 hover:underline"
                             >
                               취소
                             </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setPendingDelete(rowKey(r))}
-                            className="text-xs text-red-600 hover:underline"
-                          >
-                            삭제
-                          </button>
+                          </div>
                         )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => setPendingDelete(rowKey(r))}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          삭제
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -441,11 +481,27 @@ export default function LeaveManagementPage() {
 
           <p className="mt-3 text-xs text-gray-400">
             총 {staffRows.length}건 · “상태” 칸을 누르면 대기 → 승인 → 반려 순으로
-            전환됩니다. “신청일”은 실제 쉬는 날짜와 다른, 신청서를 낸 날입니다.
+            전환되고, 반려로 바꿀 땐 사유를 적어야 해요. “신청일”은 실제 쉬는 날짜와 다른, 신청서를 낸 날입니다.
           </p>
         </>
       ) : (
         <LeaveUsageTab />
+      )}
+
+      {pendingDelete !== null && (
+        <ConfirmDialog
+          title="삭제하시겠습니까?"
+          message={(() => {
+            const r = rows.find((x) => rowKey(x) === pendingDelete);
+            return r ? `${r.staff_name} · ${fmtRange(r.start_date, r.end_date, r.days)}` : undefined;
+          })()}
+          onConfirm={() => {
+            const r = rows.find((x) => rowKey(x) === pendingDelete);
+            if (r) handleDelete(r);
+            else setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   );

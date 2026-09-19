@@ -13,6 +13,7 @@ export interface DayOffRequest {
   applied_at: string; // 신청일 (쉬는 날짜와는 다른 값)
   status: "requested" | "confirmed" | "rejected";
   note: string | null;
+  reject_reason: string | null; // 반려일 때 사장님이 적은 사유 (직원 화면에 보임)
   created_at: string;
 }
 
@@ -33,7 +34,10 @@ export const createDayOffRequest = (data: DayOffRequestCreate) =>
 export const updateDayOffRequest = (
   id: number,
   data: Partial<
-    Pick<DayOffRequest, "status" | "note" | "start_date" | "end_date" | "applied_at">
+    Pick<
+      DayOffRequest,
+      "status" | "note" | "start_date" | "end_date" | "applied_at" | "reject_reason"
+    >
   >,
 ) => apiSend<DayOffRequest>("PATCH", `/dayoff-requests/${id}`, data);
 

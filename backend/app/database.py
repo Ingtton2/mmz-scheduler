@@ -138,8 +138,8 @@ def _ensure_leave_request_columns() -> None:
 
 
 def _ensure_dayoff_request_columns() -> None:
-    """`applied_at`(신청일)·`status`(승인/반려) 컬럼을 새로 추가한다. 기존 신청 건은
-    created_at 날짜를 신청일로, "requested"를 상태로 채워둔다."""
+    """`applied_at`(신청일)·`status`(승인/반려)·`reject_reason`(반려 사유) 컬럼을 새로 추가한다.
+    기존 신청 건은 created_at 날짜를 신청일로, "requested"를 상태로 채워둔다."""
     with engine.begin() as conn:
         if _is_sqlite:
             cols = {
@@ -160,6 +160,8 @@ def _ensure_dayoff_request_columns() -> None:
             conn.execute(
                 text("ALTER TABLE day_off_request ADD COLUMN status VARCHAR DEFAULT 'requested'")
             )
+        if "reject_reason" not in cols:
+            conn.execute(text("ALTER TABLE day_off_request ADD COLUMN reject_reason VARCHAR"))
         if "applied_at" not in cols:
             conn.execute(text("ALTER TABLE day_off_request ADD COLUMN applied_at DATE"))
             if _is_sqlite:

@@ -6,7 +6,7 @@
 
   GET    /api/dayoff-requests        신청 목록 (직원 이름 포함, 시작일순)
   POST   /api/dayoff-requests        신청 추가 (기간 겹침 / 월 한도 초과 거부)
-  PATCH  /api/dayoff-requests/{id}   상태 변경(대기<->승인<->반려) 등 수정
+  PATCH  /api/dayoff-requests/{id}   상태 변경(대기<->승인<->반려) 등 수정. 반려로 바꿀 땐 reject_reason 필수
   DELETE /api/dayoff-requests/{id}   신청 삭제
 """
 
@@ -18,6 +18,7 @@ from sqlmodel import Session, select
 from app.database import get_session
 from app.models import MAX_PER_MONTH, DEFAULT_STORE_ID, DayOffRequest, Staff
 from app.models.base import today_kst
+from app.models.enums import LeaveRequestStatus
 from app.schemas.dayoff import DayOffRequestCreate, DayOffRequestRead, DayOffRequestUpdate
 from app.services.date_overlap import days_by_month, overlaps as _overlaps
 
@@ -39,8 +40,19 @@ def _to_read(req: DayOffRequest, staff_name: str) -> DayOffRequestRead:
         applied_at=req.applied_at,
         status=req.status,
         note=req.note,
+        reject_reason=req.reject_reason,
         created_at=req.created_at,
     )
+
+
+def _reject_reason_or_422(status: str, reason: str | None) -> str | None:
+    """반려(rejected)면 사유가 필수, 그 외 상태면 사유는 비운다."""
+    if status != LeaveRequestStatus.REJECTED.value:
+        return None
+    reason = (reason or "").strip()
+    if not reason:
+        raise HTTPException(status_code=422, detail="반려 사유를 입력해 주세요.")
+    return reason
 
 
 @router.get("", response_model=list[DayOffRequestRead])
@@ -97,6 +109,7 @@ def create_request(
         end_date=payload.end_date,
         applied_at=payload.applied_at or today_kst(),
         status=payload.status.value,
+        reject_reason=_reject_reason_or_422(payload.status.value, payload.reject_reason),
         note=(payload.note or None),
     )
     session.add(req)
@@ -115,6 +128,7 @@ def update_request(
 
     if payload.status is not None:
         req.status = payload.status.value
+        req.reject_reason = _reject_reason_or_422(req.status, payload.reject_reason)
     if payload.start_date is not None:
         req.start_date = payload.start_date
     if payload.end_date is not None:

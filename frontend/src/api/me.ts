@@ -65,6 +65,7 @@ export interface MyRequest {
   end_date: string;
   days: number;
   status: string; // requested(신청) / confirmed(확정) / rejected(반려)
+  reject_reason: string | null; // 반려일 때 사장님이 적은 사유
   note: string | null;
   created_at: string;
 }

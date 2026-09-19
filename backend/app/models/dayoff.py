@@ -31,4 +31,5 @@ class DayOffRequest(SQLModel, table=True):
     applied_at: date = Field(default_factory=today_kst)  # 신청일
     status: str = "requested"            # LeaveRequestStatus 재사용: requested / confirmed / rejected
     note: str | None = None
+    reject_reason: str | None = None     # 반려(rejected)일 때만 있음 — 직원 화면에 그대로 보여준다
     created_at: datetime = Field(default_factory=utcnow)

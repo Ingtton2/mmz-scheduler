@@ -13,10 +13,12 @@ class DayOffRequestCreate(_DateRange):
     note: str | None = None
     status: LeaveRequestStatus = LeaveRequestStatus.REQUESTED
     applied_at: date | None = None  # 비우면 오늘 날짜로 저장
+    reject_reason: str | None = None  # status 가 rejected 일 때 필수
 
 
 class DayOffRequestUpdate(BaseModel):
     status: LeaveRequestStatus | None = None
+    reject_reason: str | None = None  # status 를 rejected 로 바꿀 때 필수
     note: str | None = None
     start_date: date | None = None
     end_date: date | None = None
@@ -33,6 +35,7 @@ class DayOffRequestRead(BaseModel):
     applied_at: date
     status: str
     note: str | None
+    reject_reason: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

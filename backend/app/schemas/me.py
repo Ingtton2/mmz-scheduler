@@ -33,6 +33,7 @@ class MyDayOffRequestOut(BaseModel):
     end_date: date
     days: int
     status: str  # requested(신청) / confirmed(확정) / rejected(반려)
+    reject_reason: str | None = None  # 반려일 때 사장님이 적은 사유
     note: str | None
     created_at: datetime
 

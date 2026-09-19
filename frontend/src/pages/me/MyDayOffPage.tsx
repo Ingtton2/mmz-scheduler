@@ -1,5 +1,5 @@
 // 내 사전 휴무 신청 (스펙 9-4, 9-5). 다음 달 스케줄분만, 이번 달 20일 17시까지.
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { createMyDayOff, getMe, listMyDayOff, type MeInfo, type MyRequest } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
 import { fmtRange } from "../../utils/format";
@@ -163,24 +163,36 @@ export default function MyDayOffPage() {
                 </td>
               </tr>
             ) : (
-              requests.map((r) => (
-                <tr key={r.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-medium whitespace-nowrap">
-                    {fmtRange(r.start_date, r.end_date, r.days)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={
-                        "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap " +
-                        (STATUS[r.status]?.cls ?? "bg-gray-100 text-gray-600")
-                      }
-                    >
-                      {STATUS[r.status]?.label ?? r.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
-                </tr>
-              ))
+              requests.map((r) => {
+                const reason = r.status === "rejected" ? r.reject_reason : null;
+                return (
+                  <Fragment key={r.id}>
+                    <tr className={"last:border-0 " + (reason ? "" : "border-b")}>
+                      <td className="px-3 py-2 font-medium whitespace-nowrap">
+                        {fmtRange(r.start_date, r.end_date, r.days)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap " +
+                            (STATUS[r.status]?.cls ?? "bg-gray-100 text-gray-600")
+                          }
+                        >
+                          {STATUS[r.status]?.label ?? r.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
+                    </tr>
+                    {reason && (
+                      <tr className="border-b last:border-0">
+                        <td colSpan={3} className="px-3 pb-2 text-xs text-gray-500">
+                          반려 사유: {reason}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })
             )}
           </tbody>
         </table>
