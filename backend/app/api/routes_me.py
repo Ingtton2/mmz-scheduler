@@ -10,6 +10,7 @@ Authorization: Bearer <직원 토큰> 을 직접 검증한다.
   GET    /api/me/leave-requests         내 연차 신청 목록
   POST   /api/me/leave-requests         내 연차 신청 (다음달만, 20일 17시까지 — 스펙 9-5)
   DELETE /api/me/leave-requests/{id}    내 연차 신청 취소 (대기 중인 것만)
+  GET    /api/me/holidays               관리자가 등록한 공휴일 (달력 표시용)
   GET    /api/me/dayoff-requests        내 사전휴무 신청 목록
   POST /api/me/dayoff-requests        내 사전휴무 신청 (다음달만, 20일 17시까지, 월 20일 한도)
   GET  /api/me/schedule/{year}/{month}       내 스케줄만 (공유된 스케줄만 — 임시면 404)
@@ -26,6 +27,7 @@ from app.models import (
     MAX_PER_MONTH,
     DEFAULT_STORE_ID,
     DayOffRequest,
+    Holiday,
     LeaveBalance,
     LeaveRequest,
     Schedule,
@@ -33,6 +35,7 @@ from app.models import (
     Staff,
     StaffAccount,
 )
+from app.schemas.holiday import HolidayItem
 from app.schemas.leave import LeaveBalanceRead
 from app.schemas.me import MyDayOffRequestOut, MyLeaveRequestOut, MyRequestCreate, MyScheduleResult
 from app.schemas.schedule import PublicScheduleResult
@@ -234,6 +237,20 @@ def create_my_dayoff(
         note=req.note,
         created_at=req.created_at,
     )
+
+
+# --- 공휴일 (표시 전용) ---------------------------------------------------
+
+
+@router.get("/holidays", response_model=list[HolidayItem])
+def my_holidays(
+    staff: Staff = Depends(get_current_staff),  # noqa: ARG001 — 로그인만 확인하면 됨
+    session: Session = Depends(get_session),
+) -> list[HolidayItem]:
+    rows = session.exec(
+        select(Holiday).where(Holiday.store_id == DEFAULT_STORE_ID).order_by(Holiday.date)
+    ).all()
+    return [HolidayItem(id=r.id, date=r.date, name=r.name) for r in rows]
 
 
 # --- 내 스케줄 -------------------------------------------------------------

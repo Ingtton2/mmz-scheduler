@@ -1,19 +1,17 @@
-// 내 스케줄 조회 (스펙 9-4). 본인 칸만 보여준다 — 팀 전체 표는 "전체 스케줄" 메뉴(MyTeamSchedulePage)에서.
+// 내 스케줄 조회 (스펙 9-4). 본인 칸만 달력으로 보여준다 — 팀 전체 표는 "전체 스케줄" 메뉴(MyTeamSchedulePage)에서.
 import { useEffect, useState } from "react";
-import { getMySchedule, type MyScheduleResult } from "../../api/me";
+import { getMyHolidays, getMySchedule, type MyScheduleResult } from "../../api/me";
 import { MeApiError } from "../../api/meClient";
+import { todayKst } from "../../utils/month";
 import { CELL } from "../SchedulePage";
 import MeNav from "./MeNav";
 
 const WD_CHAR = ["일", "월", "화", "수", "목", "금", "토"];
-const parseWd = (s: string) => {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay();
-};
+const pad = (n: number) => String(n).padStart(2, "0");
 
 function thisYm(): { year: number; month: number } {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const { year, month } = todayKst();
+  return { year, month };
 }
 
 function shift(year: number, month: number, delta: number): { year: number; month: number } {
@@ -21,11 +19,34 @@ function shift(year: number, month: number, delta: number): { year: number; mont
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
+// 그 달의 달력 칸 목록: 1일 앞은 빈 칸(null), 마지막 주도 7칸으로 채운다.
+function calendarCells(year: number, month: number): (string | null)[] {
+  const firstWd = new Date(year, month - 1, 1).getDay();
+  const lastDay = new Date(year, month, 0).getDate();
+  const cells: (string | null)[] = Array(firstWd).fill(null);
+  for (let d = 1; d <= lastDay; d++) cells.push(`${year}-${pad(month)}-${pad(d)}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+const wdColor = (wd: number) =>
+  wd === 0 ? "text-red-500" : wd === 6 ? "text-blue-500" : "text-gray-700";
+
 export default function MySchedulePage() {
   const [{ year, month }, setYm] = useState(thisYm());
   const [data, setData] = useState<MyScheduleResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const todayIso = todayKst().iso;
+  const cells = calendarCells(year, month);
+  // 공휴일(날짜 -> 이름). 표시 전용이라 못 불러와도 달력은 그대로 보여준다.
+  const [holidays, setHolidays] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    getMyHolidays()
+      .then((list) => setHolidays(Object.fromEntries(list.map((h) => [h.date, h.name]))))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -76,33 +97,68 @@ export default function MySchedulePage() {
             <span className="rounded bg-gray-50 px-2 py-1">연차 {data.summary.leave ?? 0}일</span>
             <span className="rounded bg-gray-50 px-2 py-1">사휴 {data.summary.blocked ?? 0}일</span>
           </div>
+
           <div className="overflow-hidden rounded-lg border bg-white">
-            {data.days.map((d) => {
-              const code = data.cells[d];
-              const meta = code ? CELL[code] : undefined;
-              const wd = parseWd(d);
-              return (
-                <div
-                  key={d}
-                  className="flex items-center justify-between border-b px-3 py-2 text-sm last:border-0"
-                >
-                  <span
-                    className={
-                      wd === 0 ? "text-red-500" : wd === 6 ? "text-blue-500" : "text-gray-700"
-                    }
-                  >
-                    {d.slice(5)} ({WD_CHAR[wd]})
-                  </span>
-                  {code ? (
-                    <span className={"rounded-full px-2 py-0.5 text-xs font-semibold " + (meta?.cls ?? "")}>
-                      {meta?.short ?? code}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-300">—</span>
-                  )}
+            <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-xs font-medium">
+              {WD_CHAR.map((w, wd) => (
+                <div key={w} className={"py-2 " + wdColor(wd)}>
+                  {w}
                 </div>
-              );
-            })}
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {cells.map((d, i) => {
+                const wd = i % 7;
+                const isLastRow = i >= cells.length - 7;
+                const base =
+                  "flex min-h-[3.5rem] flex-col items-center gap-1 px-0.5 py-1 " +
+                  (wd !== 6 ? "border-r " : "") +
+                  (isLastRow ? "" : "border-b ");
+                if (!d) return <div key={`blank-${i}`} className={base + "bg-gray-50/50"} />;
+
+                const code = data.cells[d];
+                const meta = code ? CELL[code] : undefined;
+                const isToday = d === todayIso;
+                const holidayName = holidays[d];
+                return (
+                  <div
+                    key={d}
+                    title={holidayName}
+                    className={base + (isToday ? "bg-amber-50" : "")}
+                  >
+                    <span
+                      className={
+                        "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs " +
+                        (isToday
+                          ? "bg-[#B08968] font-semibold text-white"
+                          : holidayName
+                            ? "font-semibold text-rose-700"
+                            : wdColor(wd))
+                      }
+                    >
+                      {Number(d.slice(8))}
+                    </span>
+                    {code ? (
+                      <span
+                        className={
+                          "rounded-full px-1.5 py-0.5 text-[11px] leading-none font-semibold " +
+                          (meta?.cls ?? "bg-gray-100 text-gray-600")
+                        }
+                      >
+                        {meta?.short ?? code}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">—</span>
+                    )}
+                    {holidayName && (
+                      <span className="line-clamp-2 px-0.5 text-center text-[8px] leading-tight break-all text-rose-600">
+                        {holidayName}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </>
       ) : (

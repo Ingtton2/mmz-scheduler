@@ -1,5 +1,6 @@
 // 직원 셀프서비스 API (스펙 9): 가입/로그인/PIN변경/내 연차·사전휴무/내 스케줄.
 import { meGet, meSend } from "./meClient";
+import type { HolidayItem } from "./holiday";
 import type { PublicScheduleResult } from "./public";
 
 export interface AvailableStaff {
@@ -94,3 +95,6 @@ export const getMySchedule = (year: number, month: number) =>
 // 이번 달 전체 직원 스케줄 (동료 근무일 확인, 대타 부탁용). 공유된 스케줄만 보임.
 export const getMyTeamSchedule = (year: number, month: number) =>
   meGet<PublicScheduleResult>(`/me/team-schedule/${year}/${month}`);
+
+// 관리자가 등록한 공휴일 — 내 스케줄 달력에 이름을 표시하는 용도.
+export const getMyHolidays = () => meGet<HolidayItem[]>("/me/holidays");

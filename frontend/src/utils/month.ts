@@ -53,3 +53,10 @@ export function selfServiceTargetYm(today: Date = new Date()): string {
   const { year, month } = kstParts(today);
   return shiftYm(`${year}-${String(month).padStart(2, "0")}`, 1);
 }
+
+// 오늘 날짜(한국시간). 기기 시간대와 상관없이 "YYYY-MM-DD" 와 연/월을 돌려준다.
+export function todayKst(now: Date = new Date()): { year: number; month: number; iso: string } {
+  const { year, month, day } = kstParts(now);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return { year, month, iso: `${year}-${pad(month)}-${pad(day)}` };
+}
