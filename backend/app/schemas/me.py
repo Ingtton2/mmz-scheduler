@@ -32,6 +32,7 @@ class MyDayOffRequestOut(BaseModel):
     start_date: date
     end_date: date
     days: int
+    status: str  # requested(신청) / confirmed(확정) / rejected(반려)
     note: str | None
     created_at: datetime
 

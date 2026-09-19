@@ -64,6 +64,7 @@ export interface MyRequest {
   start_date: string;
   end_date: string;
   days: number;
+  status: string; // requested(신청) / confirmed(확정) / rejected(반려)
   note: string | null;
   created_at: string;
 }

@@ -6,6 +6,13 @@ import { fmtRange } from "../../utils/format";
 import { selfServiceTargetYm, selfServiceWindowOpen, ymLabel } from "../../utils/month";
 import MeNav from "./MeNav";
 
+// 사장님이 승인하면 "확정", 아직이면 "신청" (반려는 "반려").
+const STATUS: Record<string, { label: string; cls: string }> = {
+  confirmed: { label: "확정", cls: "bg-mint text-mint-ink" },
+  requested: { label: "신청", cls: "bg-amber-100 text-amber-800" },
+  rejected: { label: "반려", cls: "bg-warn text-warn-ink" },
+};
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function MyDayOffPage() {
@@ -138,19 +145,20 @@ export default function MyDayOffPage() {
           <thead className="border-b bg-gray-50 text-left text-gray-500">
             <tr>
               <th className="px-3 py-2">기간</th>
+              <th className="px-3 py-2">상태</th>
               <th className="px-3 py-2">메모</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={2} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
                   불러오는 중…
                 </td>
               </tr>
             ) : requests.length === 0 ? (
               <tr>
-                <td colSpan={2} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={3} className="px-3 py-6 text-center text-gray-400">
                   아직 신청한 사전 휴무가 없습니다.
                 </td>
               </tr>
@@ -159,6 +167,16 @@ export default function MyDayOffPage() {
                 <tr key={r.id} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium whitespace-nowrap">
                     {fmtRange(r.start_date, r.end_date, r.days)}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={
+                        "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap " +
+                        (STATUS[r.status]?.cls ?? "bg-gray-100 text-gray-600")
+                      }
+                    >
+                      {STATUS[r.status]?.label ?? r.status}
+                    </span>
                   </td>
                   <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
                 </tr>

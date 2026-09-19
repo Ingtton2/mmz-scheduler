@@ -213,6 +213,7 @@ def my_dayoff_requests(
             start_date=r.start_date,
             end_date=r.end_date,
             days=(r.end_date - r.start_date).days + 1,
+            status=r.status,
             note=r.note,
             created_at=r.created_at,
         )
@@ -268,6 +269,7 @@ def create_my_dayoff(
         start_date=req.start_date,
         end_date=req.end_date,
         days=(req.end_date - req.start_date).days + 1,
+        status=req.status,
         note=req.note,
         created_at=req.created_at,
     )
