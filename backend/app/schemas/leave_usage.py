@@ -42,5 +42,8 @@ class LeaveUsageLogRead(BaseModel):
     days: float
     applied_at: date
     remaining_after: float
+    # 자동배치 방식 사용 이력: 어느 달 배치인지 + 실제 연차로 잡힌 날짜들. 예전 승인 방식 이력은 None/빈 목록.
+    year_month: str | None = None
+    dates: list[date] = []
 
     model_config = {"from_attributes": True}

@@ -1,8 +1,8 @@
 // "연차 관리 > 연차 사용 현황" 탭 (스펙 3, 4단계).
 //  - 이번 달 부여 대상 카드 (입사일 기준 자동 계산)
-//  - 전 직원 연차 사용 현황 표
+//  - 전 직원 연차 사용 현황 표 (입사일 표시 + 사장님이 직접 연차 추가)
 //  - 부여 이력 / 사용 이력 로그
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { listStaff, type Staff } from "../api/staff";
 import {
   createGrant,
@@ -29,6 +29,11 @@ export default function LeaveUsageTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [grantingId, setGrantingId] = useState<number | null>(null);
+  // 직원별 "연차 추가" 인라인 폼 (한 번에 한 명만 펼침)
+  const [addingId, setAddingId] = useState<number | null>(null);
+  const [addDays, setAddDays] = useState("");
+  const [addNote, setAddNote] = useState("");
+  const [savingAdd, setSavingAdd] = useState(false);
 
   async function refresh() {
     setLoading(true);
@@ -69,6 +74,36 @@ export default function LeaveUsageTab() {
       setError((e as Error).message);
     } finally {
       setGrantingId(null);
+    }
+  }
+
+  function openAdd(id: number) {
+    setAddingId(id);
+    setAddDays("");
+    setAddNote("");
+    setError("");
+  }
+
+  async function handleAdd(staffId: number) {
+    const days = Number(addDays);
+    if (!Number.isFinite(days) || days <= 0) {
+      setError("추가할 연차 일수를 0보다 크게 입력해 주세요.");
+      return;
+    }
+    setSavingAdd(true);
+    try {
+      await createGrant({
+        staff_id: staffId,
+        days,
+        note: addNote.trim() || "사장님 직접 추가",
+      });
+      setError("");
+      setAddingId(null);
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSavingAdd(false);
     }
   }
 
@@ -124,34 +159,87 @@ export default function LeaveUsageTab() {
             <thead className="border-b bg-gray-50 text-left text-gray-500">
               <tr>
                 <th className="px-3 py-2">이름</th>
+                <th className="px-3 py-2">입사일</th>
                 <th className="px-3 py-2 text-right">부여연차</th>
                 <th className="px-3 py-2 text-right">사용연차</th>
                 <th className="px-3 py-2 text-right">잔여연차</th>
+                <th className="px-3 py-2 text-right">연차 추가</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
                     불러오는 중…
                   </td>
                 </tr>
               ) : staffWithLeave.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
+                  <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
                     연차 관리 대상 직원이 없습니다.
                   </td>
                 </tr>
               ) : (
                 staffWithLeave.map((s) => (
-                  <tr key={s.id} className="border-b last:border-0">
-                    <td className="px-3 py-2 font-medium">{s.name}</td>
-                    <td className="px-3 py-2 text-right">{fmtDays(s.leave!.granted)}</td>
-                    <td className="px-3 py-2 text-right">{fmtDays(s.leave!.used)}</td>
-                    <td className="px-3 py-2 text-right font-semibold">
-                      {fmtDays(s.leave!.remaining)}
-                    </td>
-                  </tr>
+                  <Fragment key={s.id}>
+                    <tr className="border-b last:border-0">
+                      <td className="px-3 py-2 font-medium">{s.name}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+                        {s.hire_date ?? <span className="text-gray-300">-</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right">{fmtDays(s.leave!.granted)}</td>
+                      <td className="px-3 py-2 text-right">{fmtDays(s.leave!.used)}</td>
+                      <td className="px-3 py-2 text-right font-semibold">
+                        {fmtDays(s.leave!.remaining)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => (addingId === s.id ? setAddingId(null) : openAdd(s.id))}
+                          className="rounded border border-primary px-2.5 py-1 text-xs font-medium text-primary hover:bg-gray-50"
+                        >
+                          {addingId === s.id ? "닫기" : "+ 추가"}
+                        </button>
+                      </td>
+                    </tr>
+                    {addingId === s.id && (
+                      <tr className="border-b bg-gray-50 last:border-0">
+                        <td colSpan={6} className="px-3 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-medium text-gray-600">
+                              {s.name} 연차 추가
+                            </span>
+                            <input
+                              type="number"
+                              min="0.5"
+                              step="0.5"
+                              inputMode="decimal"
+                              value={addDays}
+                              onChange={(e) => setAddDays(e.target.value)}
+                              placeholder="일수 (예: 0.5)"
+                              className="w-40 rounded border px-2 py-1.5 text-base sm:text-sm"
+                              autoFocus
+                            />
+                            <input
+                              type="text"
+                              value={addNote}
+                              onChange={(e) => setAddNote(e.target.value)}
+                              placeholder="메모 (선택)"
+                              className="w-48 rounded border px-2 py-1.5 text-base sm:text-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAdd(s.id)}
+                              disabled={savingAdd}
+                              className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+                            >
+                              {savingAdd ? "추가 중…" : "연차 추가"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))
               )}
             </tbody>
@@ -204,7 +292,7 @@ export default function LeaveUsageTab() {
       <section>
         <h2 className="mb-2 text-sm font-semibold text-gray-700">사용 이력</h2>
         <p className="mb-2 text-xs text-gray-400">
-          "신청 승인" 탭에서 연차를 승인하면 자동으로 기록됩니다.
+          근무표 관리에서 자동배치를 실행하면 직원별 사용 개수가 자동으로 기록됩니다.
         </p>
         <div className="overflow-x-auto rounded-lg border bg-white">
           <table className="w-full text-sm">
@@ -213,7 +301,7 @@ export default function LeaveUsageTab() {
                 <th className="px-3 py-2">직원명</th>
                 <th className="px-3 py-2">사용일</th>
                 <th className="px-3 py-2 text-right">사용일수</th>
-                <th className="px-3 py-2">신청일</th>
+                <th className="px-3 py-2">기록일</th>
                 <th className="px-3 py-2 text-right">사용 후 잔여연차</th>
               </tr>
             </thead>
@@ -234,10 +322,19 @@ export default function LeaveUsageTab() {
                 usageLog.map((u) => (
                   <tr key={u.id} className="border-b last:border-0">
                     <td className="px-3 py-2 font-medium">{u.staff_name}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {u.start_date === u.end_date
-                        ? u.start_date
-                        : `${u.start_date} ~ ${u.end_date}`}
+                    <td className="px-3 py-2">
+                      {u.year_month ? (
+                        <>
+                          <span className="text-xs text-gray-400">{u.year_month} 자동배치</span>
+                          <div className="whitespace-nowrap">
+                            {u.dates.map((d) => d.slice(5)).join(", ") || "-"}
+                          </div>
+                        </>
+                      ) : u.start_date === u.end_date ? (
+                        u.start_date
+                      ) : (
+                        `${u.start_date} ~ ${u.end_date}`
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">{fmtDays(u.days)}일</td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-500">{u.applied_at}</td>

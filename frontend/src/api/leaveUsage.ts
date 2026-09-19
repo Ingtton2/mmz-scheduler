@@ -34,6 +34,9 @@ export interface LeaveUsageLogEntry {
   days: number;
   applied_at: string;
   remaining_after: number;
+  // 자동배치 방식 사용 이력이면 "YYYY-MM" + 실제 연차로 잡힌 날짜들. 예전 승인 방식 이력은 null/빈 배열.
+  year_month: string | null;
+  dates: string[];
 }
 
 export const listGrantCandidates = () =>

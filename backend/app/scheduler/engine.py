@@ -38,6 +38,7 @@
 from __future__ import annotations
 
 import calendar
+import random
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -121,6 +122,10 @@ class SolveInput:
     staff: list[StaffInput]
     # 연차: 그 날 배치 금지 + 총 근무일수도 그만큼 줄어듦
     leave_dates: dict[int, set[date]] = field(default_factory=dict)
+    # 이번 달 연차 사용 개수 (직원 id -> 개수). 날짜는 엔진이 "이미 쉬는 날" 중에서 고른다
+    # (필요인원 부족을 만들지 않는 범위에서, 작은 랜덤 가중치로 흩뿌림). 근무일수는 그만큼 줄어듦.
+    leave_counts: dict[int, int] = field(default_factory=dict)
+    random_seed: int | None = None  # 연차 날짜 랜덤 선택용 (테스트에서 고정)
     # 사전 휴무 신청: 그 날 배치 금지 (하드), 총 근무일수는 유지 (다른 날로 채움)
     blocked_dates: dict[int, set[date]] = field(default_factory=dict)
     # 등록된 공휴일(대체공휴일 포함). 정직원·점장 휴무 공정성 계산(주말+공휴일
@@ -153,6 +158,7 @@ class SolveResult:
     warnings: list[SolveWarning] = field(default_factory=list)
     feasible: bool = True
     solve_seconds: float = 0.0
+    leave_placed: dict[int, int] = field(default_factory=dict)  # 직원 id -> 실제 배치된 연차 개수
 
 
 def _month_days(year: int, month: int) -> list[date]:
@@ -209,6 +215,9 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     sm: dict[tuple[int, int], cp_model.IntVar] = {}   # 정직원 미들
     sc: dict[tuple[int, int], cp_model.IntVar] = {}   # 정직원 마감
 
+    lv: dict[tuple[int, int], cp_model.IntVar] = {}   # 엔진이 고른 연차일 (이미 쉬는 날 중)
+    rng = random.Random(inp.random_seed)
+
     for s in staff:
         off = inp.leave_dates.get(s.id, set())
         blk = inp.blocked_dates.get(s.id, set())
@@ -220,6 +229,10 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 m.Add(w == 0)  # 연차 / 사전 휴무 / 근무 불가 요일 -> 배치 금지
             elif s.fixed:
                 m.Add(w == 1)
+            elif inp.leave_counts.get(s.id, 0) > 0:
+                v = m.NewBoolVar(f"lv_{s.id}_{di}")
+                m.Add(v <= 1 - w)  # 쉬는 날에만 연차 라벨을 붙일 수 있음 -> 인원 부족일을 만들지 않음
+                lv[(s.id, di)] = v
 
             if s.position == "both":
                 h = m.NewBoolVar(f"ah_{s.id}_{di}")
@@ -353,9 +366,23 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     def workdays(sid: int):
         return sum(work[(sid, di)] for di in range(n_days))
 
+    def leave_expr(s: StaffInput):
+        """그 달 연차 일수 = 고정 날짜 연차 + 엔진이 고른 연차일."""
+        fixed_lv = len(inp.leave_dates.get(s.id, set()) & day_set)
+        return fixed_lv + sum(lv[(s.id, di)] for di in range(n_days) if (s.id, di) in lv)
+
     def off_expr(s: StaffInput):
-        lv = len(inp.leave_dates.get(s.id, set()) & day_set)
-        return n_days - lv - workdays(s.id)
+        return n_days - leave_expr(s) - workdays(s.id)
+
+    # --- 연차 개수 채우기: 못 채우면 슬랙(소프트, 필요인원 부족보다는 약함) ---
+    leave_short: dict[int, cp_model.IntVar] = {}
+    for s in staff:
+        want = inp.leave_counts.get(s.id, 0)
+        if want <= 0 or not any((s.id, di) in lv for di in range(n_days)):
+            continue
+        sh = m.NewIntVar(0, want, f"leaveshort_{s.id}")
+        m.Add(sum(lv[(s.id, di)] for di in range(n_days) if (s.id, di) in lv) + sh == want)
+        leave_short[s.id] = sh
 
     # --- 정직원/점장 기본휴무(D/O) 고정 (연차 제외) ---
     #   목표: 그 달 휴일수(D/O + 사전휴무) == 기본휴무 일수  (연차는 별개로 이미 빠짐)
@@ -368,13 +395,13 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     for s in staff:
         if s.min_days_off <= 0:
             continue
-        lv = len(inp.leave_dates.get(s.id, set()) & day_set)
+        lvx = leave_expr(s)
         bk = len(inp.blocked_dates.get(s.id, set()) & day_set)
         target = s.min_days_off
         if bk > target:
             blk_over_target.add(s.id)
-        need_work = n_days - lv - target  # 기본휴무를 정확히 쓰면 이만큼 근무
-        oe = off_expr(s)                  # = n_days - lv - workdays  (그 달 비근무·비연차 일수)
+        need_work = n_days - lvx - target  # 기본휴무를 정확히 쓰면 이만큼 근무
+        oe = off_expr(s)                   # = n_days - lv - workdays  (그 달 비근무·비연차 일수)
 
         over = m.NewIntVar(0, n_days, f"overrest_{s.id}")
         under = m.NewIntVar(0, n_days, f"underrest_{s.id}")
@@ -544,6 +571,8 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     W_SHORT = 100_000
     W_DAILY_EXCESS = 100_000  # 하루 총원 상한 초과 (부족과 동급 우선순위)
     W_HEADCOUNT = 100_000  # 하루 총 출근 인원 목표 미달 (필요인원과 동급 우선순위)
+    W_LEAVE_SHORT = 20_000  # 요청한 연차 개수를 못 채움 — 필요인원 부족(100,000)보다 약해서
+                            # 연차 때문에 인원이 모자라느니 연차를 덜 넣는다
     W_UNDERREST = 4_000    # 초과근무 (인원 부족 시 허용)
     W_OFFDAY_FAIR = 2_000  # 정직원·점장 휴무공정성(주말+공휴일 최소/최대) 위반 (하드에 준함)
     W_STREAK = 1_000       # 6일 이상 연속 근무 (불가피하면 허용)
@@ -574,6 +603,11 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         obj += W_OFFDAY_FAIR * sum(offday_max_over.values())
     if offday_target_dev:
         obj += W_OFFDAY_TARGET * sum(offday_target_dev.values())
+    if leave_short:
+        obj += W_LEAVE_SHORT * sum(leave_short.values())
+    if lv:
+        # 연차일을 랜덤하게 흩뿌리기 위한 아주 작은 가중치 (다른 규칙엔 영향 없는 동점 깨기)
+        obj += sum(rng.randint(0, 3) * v for v in lv.values())
     if rotation_dev is not None:
         obj += W_ROTATION_PREF * rotation_dev
     if close_backup_dev is not None:
@@ -626,6 +660,10 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
             elif d in blk:
                 code = CODE_BLOCKED
                 summ["blocked"] += 1
+            elif (s.id, di) in lv and solver.Value(lv[(s.id, di)]) == 1:
+                code = CODE_LEAVE
+                summ["leave"] += 1
+                result.leave_placed[s.id] = result.leave_placed.get(s.id, 0) + 1
             elif solver.Value(work[(s.id, di)]) == 1:
                 p = pos_of(s, di)
                 if s.is_part_time:
@@ -748,6 +786,19 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
                 SolveWarning(
                     "", "초과근무", want, want - g,
                     f"{name_by_id[sid]}: 기본휴무 {want}일 목표인데 {want - g}일만 쉼 (+{g}일 초과근무) · 인원이 부족합니다",
+                )
+            )
+
+    # --- 경고: 요청한 연차 개수를 다 못 넣은 경우 ---
+    for sid, sh in leave_short.items():
+        g = solver.Value(sh)
+        if g > 0:
+            want = inp.leave_counts[sid]
+            result.warnings.append(
+                SolveWarning(
+                    "", "연차", want, want - g,
+                    f"{name_by_id[sid]}: 연차 {want}개 중 {want - g}개만 배치 — "
+                    f"인원이 부족해지는 날에는 연차를 넣지 않습니다",
                 )
             )
 

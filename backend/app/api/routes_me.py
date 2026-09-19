@@ -153,69 +153,6 @@ def my_leave_requests(
     ]
 
 
-@router.post("/leave-requests", response_model=MyLeaveRequestOut, status_code=201)
-def create_my_leave(
-    payload: MyRequestCreate,
-    staff: Staff = Depends(get_current_staff),
-    session: Session = Depends(get_session),
-) -> MyLeaveRequestOut:
-    _check_not_part_time(staff, "연차 신청")
-    try:
-        check_window(payload.start_date, payload.end_date, _today())
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-    existing = session.exec(
-        select(LeaveRequest).where(LeaveRequest.staff_id == staff.id)
-    ).all()
-    if any(
-        overlaps(payload.start_date, payload.end_date, r.start_date, r.end_date)
-        for r in existing
-    ):
-        raise HTTPException(status_code=409, detail="이미 신청한 기간과 겹칩니다.")
-
-    req = LeaveRequest(
-        store_id=DEFAULT_STORE_ID,
-        staff_id=staff.id,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
-        applied_at=_today(),
-        status="requested",
-        note=(payload.note or None),
-    )
-    session.add(req)
-    session.commit()
-    session.refresh(req)
-    return MyLeaveRequestOut(
-        id=req.id,
-        start_date=req.start_date,
-        end_date=req.end_date,
-        days=(req.end_date - req.start_date).days + 1,
-        applied_at=req.applied_at,
-        status=req.status,
-        note=req.note,
-        created_at=req.created_at,
-    )
-
-
-@router.delete("/leave-requests/{request_id}", status_code=204)
-def cancel_my_leave(
-    request_id: int,
-    staff: Staff = Depends(get_current_staff),
-    session: Session = Depends(get_session),
-) -> None:
-    req = session.get(LeaveRequest, request_id)
-    if req is None or req.staff_id != staff.id:
-        raise HTTPException(status_code=404, detail="해당 신청을 찾을 수 없습니다.")
-    if req.status != "requested":
-        raise HTTPException(
-            status_code=400,
-            detail="이미 승인/반려된 신청은 취소할 수 없습니다. 사장님께 문의해주세요.",
-        )
-    session.delete(req)
-    session.commit()
-
-
 # --- 사전 휴무 ------------------------------------------------------------
 
 

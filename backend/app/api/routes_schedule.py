@@ -1,7 +1,9 @@
 """
 자동배치 실행 / 저장 / 수동 수정 / 공유 API (스펙 5, 6.1, 7).
 
-  POST  /api/schedule/auto              { year, month }  -> 자동배치 + 저장 + 결과
+  POST  /api/schedule/auto              { year, month, leave_days? }  -> 자동배치 + 저장 + 결과
+                                        (leave_days: 직원 id -> 이번 달 연차 개수, 날짜는 엔진이 랜덤 배정 + 사용연차 차감)
+  GET   /api/schedule/leave-plan?year=&month=  -> 직원별 사용 가능 잔여연차 + 저장된 개수
   GET   /api/schedule?year=&month=      -> 저장된 스케줄 (없으면 404)
   PATCH /api/schedule/entries           { year, month, changes[] } -> 셀 수동 수정
   POST  /api/schedule/{year}/{month}/share  -> "공유됨(confirmed)" 상태로 전환
@@ -21,7 +23,7 @@ from app.models import (
     DayOffRequest,
     Holiday,
     LeaveBalance,
-    LeaveRequest,
+    MonthlyLeavePlan,
     Schedule,
     ScheduleEntry,
     Staff,
@@ -38,6 +40,7 @@ from app.schemas.schedule import (
     AutoScheduleRequest,
     ManualEditRequest,
     ScheduleResult,
+    LeavePlanRow,
     ScheduleStaffRow,
     ScheduleWarningOut,
     ShareResult,
@@ -60,17 +63,6 @@ def _load_active_staff(session: Session) -> list[Staff]:
             .order_by(Staff.role == "owner", Staff.sort_order, Staff.created_at)  # 사장님을 아래로
         ).all()
     )
-
-
-def _load_leave_dates(session: Session) -> dict[int, set[date]]:
-    """연차 기간을 날짜 집합으로 펼친다."""
-    rows = session.exec(
-        select(LeaveRequest).where(LeaveRequest.store_id == DEFAULT_STORE_ID)
-    ).all()
-    out: dict[int, set[date]] = {}
-    for r in rows:
-        out.setdefault(r.staff_id, set()).update(date_range(r.start_date, r.end_date))
-    return out
 
 
 def _load_blocked_dates(session: Session) -> dict[int, set[date]]:
@@ -158,6 +150,117 @@ def _persist(
     return sched
 
 
+def _leave_eligible(s: Staff) -> bool:
+    return has_leave_balance(s.role, s.employment_type)
+
+
+def _balance_of(session: Session, staff_id: int) -> LeaveBalance | None:
+    return session.exec(
+        select(LeaveBalance).where(LeaveBalance.staff_id == staff_id)
+    ).first()
+
+
+def _plan_of(session: Session, staff_id: int, year: int, month: int) -> MonthlyLeavePlan | None:
+    return session.exec(
+        select(MonthlyLeavePlan).where(
+            MonthlyLeavePlan.store_id == DEFAULT_STORE_ID,
+            MonthlyLeavePlan.staff_id == staff_id,
+            MonthlyLeavePlan.year == year,
+            MonthlyLeavePlan.month == month,
+        )
+    ).first()
+
+
+def _available_leave(session: Session, s: Staff, year: int, month: int) -> tuple[float, int]:
+    """(이번 달에 쓸 수 있는 잔여연차, 이 달에 이미 저장/차감된 개수).
+    이 달에 이미 차감된 분은 다시 돌릴 때 되돌려지므로 잔여에 더해서 계산한다."""
+    bal = _balance_of(session, s.id)
+    plan = _plan_of(session, s.id, year, month)
+    saved = plan.days if plan else 0
+    remaining = (bal.granted - bal.used) if bal else 0.0
+    return remaining + saved, saved
+
+
+def _validate_leave_days(
+    session: Session, staff_rows: list[Staff], year: int, month: int, leave_days: dict[int, int]
+) -> dict[int, int]:
+    by_id = {s.id: s for s in staff_rows}
+    out: dict[int, int] = {}
+    for sid, days in leave_days.items():
+        if days < 0:
+            raise HTTPException(status_code=422, detail="연차 개수는 0 이상이어야 합니다.")
+        if days == 0:
+            continue
+        s = by_id.get(sid)
+        if s is None:
+            raise HTTPException(status_code=422, detail="해당 직원을 찾을 수 없습니다.")
+        if not _leave_eligible(s):
+            raise HTTPException(
+                status_code=422, detail=f"{s.name}: 연차는 정직원·점장만 사용할 수 있습니다."
+            )
+        available, _ = _available_leave(session, s, year, month)
+        if days > available:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{s.name}: 잔여연차({available:g}개)보다 많이 지정했습니다.",
+            )
+        out[sid] = days
+    return out
+
+
+def _apply_leave_plan(
+    session: Session, staff_rows: list[Staff], year: int, month: int, placed: dict[int, int]
+) -> None:
+    """실제 배치된 연차 개수를 사용연차에서 차감한다. 이 달에 이미 차감된 분은 먼저
+    되돌린 것과 같은 효과라서(차이만큼만 가감) 다시 돌려도 중복 차감되지 않는다."""
+    for s in staff_rows:
+        if not _leave_eligible(s):
+            continue
+        new = placed.get(s.id, 0)
+        plan = _plan_of(session, s.id, year, month)
+        prev = plan.days if plan else 0
+        if new == prev and plan is not None:
+            continue
+        bal = _balance_of(session, s.id)
+        if bal is None:
+            bal = LeaveBalance(store_id=DEFAULT_STORE_ID, staff_id=s.id)
+        bal.used = round(bal.used + new - prev, 2)
+        session.add(bal)
+        remaining_after = round(bal.granted - bal.used, 2)
+        if plan is None:
+            if new == 0:
+                continue
+            plan = MonthlyLeavePlan(
+                store_id=DEFAULT_STORE_ID, staff_id=s.id, year=year, month=month,
+                days=new, remaining_after=remaining_after,
+            )
+        else:
+            plan.days = new
+            plan.remaining_after = remaining_after
+            plan.applied_at = date.today()
+        session.add(plan)
+
+
+@router.get("/leave-plan", response_model=list[LeavePlanRow])
+def get_leave_plan(
+    year: int = Query(ge=2000, le=2100),
+    month: int = Query(ge=1, le=12),
+    session: Session = Depends(get_session),
+) -> list[LeavePlanRow]:
+    """자동배치 화면의 연차 입력 패널용: 직원별 사용 가능한 잔여연차 + 이 달에 저장된 개수."""
+    rows = []
+    for s in _load_active_staff(session):
+        if not _leave_eligible(s):
+            continue
+        available, saved = _available_leave(session, s, year, month)
+        rows.append(
+            LeavePlanRow(
+                staff_id=s.id, staff_name=s.name, remaining=round(available, 2), saved_days=saved
+            )
+        )
+    return rows
+
+
 @router.post("/auto", response_model=ScheduleResult)
 def run_auto_schedule(
     payload: AutoScheduleRequest, session: Session = Depends(get_session)
@@ -171,6 +274,9 @@ def run_auto_schedule(
     staff_rows = _load_active_staff(session)
     mdo = _load_min_days_off(session)
     rotation = get_or_compute_rotation(session, payload.year, payload.month)
+    leave_counts = _validate_leave_days(
+        session, staff_rows, payload.year, payload.month, payload.leave_days
+    )
 
     inp = SolveInput(
         year=payload.year,
@@ -196,7 +302,7 @@ def run_auto_schedule(
             )
             for s in staff_rows
         ],
-        leave_dates=_load_leave_dates(session),
+        leave_counts=leave_counts,
         blocked_dates=_load_blocked_dates(session),
         holiday_dates=_load_holiday_dates(session, payload.year, payload.month),
         requirements=_load_requirements(session),
@@ -204,6 +310,8 @@ def run_auto_schedule(
     )
 
     solved = build_schedule(inp)
+    if any(solved.entries.get(s.id) for s in staff_rows):  # 해를 못 찾았으면 차감하지 않음
+        _apply_leave_plan(session, staff_rows, payload.year, payload.month, solved.leave_placed)
     sched = _persist(session, solved.entries, payload.year, payload.month)
 
     rows = [

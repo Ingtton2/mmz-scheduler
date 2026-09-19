@@ -72,36 +72,18 @@ def test_change_pin_requires_current_pin(client: TestClient):
     assert relogin.status_code == 200
 
 
-def test_leave_request_window_enforced(client: TestClient, monkeypatch):
+def test_self_service_leave_request_endpoints_removed(client: TestClient):
+    """연차는 직원이 날짜로 신청하지 않는다 — 신청/취소 엔드포인트가 없고 조회만 가능."""
     _, token = _signup_and_approve(client, "연차셀프")
-    # 오늘을 2026-09-10 으로 고정 -> 10월만 허용, 20일 이전이라 열려 있음
-    monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 10))
 
-    ok = client.post(
+    res = client.post(
         "/api/me/leave-requests",
         json={"start_date": "2026-10-05", "end_date": "2026-10-05"},
         headers=_auth(token),
     )
-    assert ok.status_code == 201
-
-    wrong_month = client.post(
-        "/api/me/leave-requests",
-        json={"start_date": "2026-11-05", "end_date": "2026-11-05"},
-        headers=_auth(token),
-    )
-    assert wrong_month.status_code == 422
-
-    # 겹치는 기간은 거부
-    dup = client.post(
-        "/api/me/leave-requests",
-        json={"start_date": "2026-10-05", "end_date": "2026-10-06"},
-        headers=_auth(token),
-    )
-    assert dup.status_code == 409
-
-    listed = client.get("/api/me/leave-requests", headers=_auth(token)).json()
-    assert len(listed) == 1
-    assert listed[0]["start_date"] == "2026-10-05"
+    assert res.status_code == 405
+    assert client.delete("/api/me/leave-requests/1", headers=_auth(token)).status_code == 404
+    assert client.get("/api/me/leave-requests", headers=_auth(token)).status_code == 200
 
 
 def test_request_window_closed_after_cutoff(client: TestClient, monkeypatch):
@@ -118,18 +100,11 @@ def test_request_window_closed_after_cutoff(client: TestClient, monkeypatch):
     assert "20일" in res.json()["detail"]
 
 
-def test_part_time_blocked_from_leave_and_dayoff(client: TestClient, monkeypatch):
+def test_part_time_blocked_from_dayoff(client: TestClient, monkeypatch):
     _, token = _signup_and_approve(
         client, "파트타임셀프", employment_type="part_time"
     )
     monkeypatch.setattr(routes_me, "_today", lambda: date(2026, 9, 10))
-
-    leave = client.post(
-        "/api/me/leave-requests",
-        json={"start_date": "2026-10-05", "end_date": "2026-10-05"},
-        headers=_auth(token),
-    )
-    assert leave.status_code == 400
 
     dayoff = client.post(
         "/api/me/dayoff-requests",

@@ -7,7 +7,7 @@ const MENU = [
   {
     key: "leave",
     label: "연차 관리",
-    desc: "연차 부여 · 신청 등록 · 승인 · 반려",
+    desc: "연차 부여 · 사용 현황 · 사전휴무 승인",
     to: "/admin/leave",
   },
   {

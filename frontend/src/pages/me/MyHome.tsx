@@ -8,7 +8,7 @@ import MeNav from "./MeNav";
 const MENU = [
   { key: "schedule", label: "내 스케줄 조회", to: "/me/schedule" },
   { key: "team-schedule", label: "이번 달 전체 스케줄", to: "/me/team-schedule" },
-  { key: "leave", label: "연차 신청", to: "/me/leave" },
+  { key: "leave", label: "내 연차", to: "/me/leave" },
   { key: "dayoff", label: "사전 휴무 신청", to: "/me/dayoff" },
   { key: "pin", label: "PIN 변경", to: "/me/change-pin" },
 ];

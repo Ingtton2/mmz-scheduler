@@ -688,3 +688,60 @@ def test_close_backup_fills_close_when_manager_off():
     ]
     assert hyunseok_working_days
     assert all(r.entries[8][d] == CODE_BC for d in hyunseok_working_days)
+
+
+# --- 연차 개수 지정 (날짜는 엔진이 랜덤 배정) ---
+
+
+def _leave_days(cells: dict[str, str]) -> list[str]:
+    return sorted(d for d, v in cells.items() if v == CODE_LEAVE)
+
+
+def test_leave_counts_placed_exactly_and_do_target_kept():
+    """직원별로 지정한 개수만큼 연차가 들어가고, 기본휴무(D/O) 목표는 그대로 지켜진다."""
+    staff = _base_team()
+    r = build_schedule(
+        SolveInput(2026, 9, staff, requirements=BASIC, leave_counts={5: 3, 1: 2}, random_seed=1)
+    )
+    assert r.leave_placed == {5: 3, 1: 2}
+    assert len(_leave_days(r.entries[5])) == 3
+    assert len(_leave_days(r.entries[1])) == 2
+    for sid in (5, 1):
+        assert _n(r.entries[sid], CODE_OFF) == 8  # D/O 는 연차와 별개
+    assert _n(r.entries[5], *WORK_CODES) == 30 - 8 - 3  # 연차만큼 근무일수 감소
+    assert _real_problems(r) == [], _real_problems(r)
+
+
+def test_leave_dates_vary_with_seed():
+    """날짜는 랜덤 — seed 가 다르면 (거의 확실히) 다른 날짜가 잡힌다."""
+    staff = _base_team()
+    picks = {
+        tuple(
+            _leave_days(
+                build_schedule(
+                    SolveInput(
+                        2026, 9, staff, requirements=BASIC, leave_counts={5: 3}, random_seed=seed
+                    )
+                ).entries[5]
+            )
+        )
+        for seed in range(1, 5)
+    }
+    assert len(picks) > 1
+
+
+def test_leave_not_placed_when_it_would_cause_shortage():
+    """필요인원이 딱 맞는 팀에선 연차를 넣으면 인원이 모자라진다 — 이땐 연차를 덜 넣는다."""
+    # 홀 전담 2명이 오픈·마감 각 1명씩 매일 필요 -> 둘 다 매일 나와야 하는 구성
+    staff = [
+        StaffInput(1, "홀A", "hall", min_days_off=0),
+        StaffInput(2, "홀B", "hall", min_days_off=0),
+    ]
+    r = build_schedule(
+        SolveInput(2026, 9, staff, requirements=HALL_OC, leave_counts={1: 3}, random_seed=1)
+    )
+    assert r.leave_placed.get(1, 0) == 0
+    assert not any(v == CODE_LEAVE for v in r.entries[1].values())
+    assert any(w.position == "연차" for w in r.warnings)
+    # 필요인원은 그대로 채워짐
+    assert not any("오픈" in w.position or "마감" in w.position for w in r.warnings)

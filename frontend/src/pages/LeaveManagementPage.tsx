@@ -1,15 +1,9 @@
-// 연차 관리 화면 (스펙 3) — "신청 승인" + "연차 사용 현황" 탭 통합.
-//  - 신청 승인: 연차 신청 + 사전 휴무 신청을 한 목록에서 승인/반려.
-//  - 연차 사용 현황: 부여/사용/잔여 연차 현황 (다음 단계에서 내용 채움).
+// 연차 관리 화면 (스펙 3) — "사전휴무 승인" + "연차 사용 현황" 탭 통합.
+//  - 사전휴무 승인: 사전 휴무 신청(날짜 기반)을 승인/반려. 연차는 날짜로 신청하지 않는다 —
+//    사장님이 부여하고, 자동배치 실행 때 직원별 사용 개수를 정하면 날짜는 자동배치가 고른다.
+//  - 연차 사용 현황: 부여/사용/잔여 연차 조회 + 연차 추가.
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  createLeaveRequest,
-  deleteLeaveRequest,
-  listLeaveRequests,
-  updateLeaveRequest,
-  type LeaveRequest,
-} from "../api/leave";
 import {
   createDayOffRequest,
   deleteDayOffRequest,
@@ -27,11 +21,9 @@ import LeaveUsageTab from "./LeaveUsageTab";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-type Kind = "leave" | "dayoff";
 type Status = "requested" | "confirmed" | "rejected";
 
 type Row = {
-  kind: Kind;
   id: number;
   staff_id: number;
   staff_name: string;
@@ -42,8 +34,6 @@ type Row = {
   status: Status;
   note: string | null;
 };
-
-const KIND_LABEL: Record<Kind, string> = { leave: "연차", dayoff: "사전휴무" };
 
 // 대기 -> 승인 -> 반려 -> 대기 순으로 클릭할 때마다 전환.
 const NEXT_STATUS: Record<Status, Status> = {
@@ -66,7 +56,6 @@ function daysInMonth(start: string, end: string, targetYm: string): number {
 export default function LeaveManagementPage() {
   const [tab, setTab] = useState<"approval" | "usage">("approval");
   const [staff, setStaff] = useState<Staff[]>([]);
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [dayoffRequests, setDayoffRequests] = useState<DayOffRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -75,7 +64,6 @@ export default function LeaveManagementPage() {
   const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
 
   const [form, setForm] = useState({
-    kind: "leave" as Kind,
     staff_id: "",
     start_date: todayStr(),
     end_date: todayStr(),
@@ -85,10 +73,9 @@ export default function LeaveManagementPage() {
   const selectedStaff = staff.find((s) => s.id === Number(form.staff_id));
   const isPartTime = selectedStaff?.employment_type === "part_time";
 
-  const rows: Row[] = [
-    ...leaveRequests.map(
+  const rows: Row[] = dayoffRequests
+    .map(
       (r): Row => ({
-        kind: "leave",
         id: r.id,
         staff_id: r.staff_id,
         staff_name: r.staff_name,
@@ -99,22 +86,8 @@ export default function LeaveManagementPage() {
         status: r.status,
         note: r.note,
       }),
-    ),
-    ...dayoffRequests.map(
-      (r): Row => ({
-        kind: "dayoff",
-        id: r.id,
-        staff_id: r.staff_id,
-        staff_name: r.staff_name,
-        start_date: r.start_date,
-        end_date: r.end_date,
-        days: r.days,
-        applied_at: r.applied_at,
-        status: r.status,
-        note: r.note,
-      }),
-    ),
-  ].sort((a, b) => a.start_date.localeCompare(b.start_date));
+    )
+    .sort((a, b) => a.start_date.localeCompare(b.start_date));
 
   const visibleRows =
     monthFilter === null
@@ -132,13 +105,8 @@ export default function LeaveManagementPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const [s, lr, dr] = await Promise.all([
-        listStaff(),
-        listLeaveRequests(),
-        listDayOffRequests(),
-      ]);
+      const [s, dr] = await Promise.all([listStaff(), listDayOffRequests()]);
       setStaff(s);
-      setLeaveRequests(lr);
       setDayoffRequests(dr);
       setError("");
     } catch (e) {
@@ -155,7 +123,7 @@ export default function LeaveManagementPage() {
   // 사전휴무 선택 시: 이 직원이 시작일이 속한 달에 이미 신청한 일수
   const targetYm = form.start_date.slice(0, 7);
   const usedThisMonth =
-    form.kind === "dayoff" && form.staff_id
+    form.staff_id
       ? dayoffRequests
           .filter((r) => r.staff_id === Number(form.staff_id))
           .reduce((sum, r) => sum + daysInMonth(r.start_date, r.end_date, targetYm), 0)
@@ -173,21 +141,12 @@ export default function LeaveManagementPage() {
     }
     setSaving(true);
     try {
-      if (form.kind === "leave") {
-        await createLeaveRequest({
-          staff_id: Number(form.staff_id),
-          start_date: form.start_date,
-          end_date: form.end_date,
-          note: form.note.trim() || null,
-        });
-      } else {
-        await createDayOffRequest({
-          staff_id: Number(form.staff_id),
-          start_date: form.start_date,
-          end_date: form.end_date,
-          note: form.note.trim() || null,
-        });
-      }
+      await createDayOffRequest({
+        staff_id: Number(form.staff_id),
+        start_date: form.start_date,
+        end_date: form.end_date,
+        note: form.note.trim() || null,
+      });
       setForm({ ...form, note: "" });
       setError("");
       await refresh();
@@ -201,11 +160,7 @@ export default function LeaveManagementPage() {
   async function toggleStatus(r: Row) {
     try {
       const next = NEXT_STATUS[r.status];
-      if (r.kind === "leave") {
-        await updateLeaveRequest(r.id, { status: next });
-      } else {
-        await updateDayOffRequest(r.id, { status: next });
-      }
+      await updateDayOffRequest(r.id, { status: next });
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -214,11 +169,7 @@ export default function LeaveManagementPage() {
 
   async function handleDelete(r: Row) {
     try {
-      if (r.kind === "leave") {
-        await deleteLeaveRequest(r.id);
-      } else {
-        await deleteDayOffRequest(r.id);
-      }
+      await deleteDayOffRequest(r.id);
       setPendingDelete(null);
       await refresh();
     } catch (e) {
@@ -228,7 +179,7 @@ export default function LeaveManagementPage() {
 
   const field = "rounded border border-gray-300 px-3 py-2 text-sm";
   const hasStaff = staff.length > 0;
-  const rowKey = (r: Row) => `${r.kind}-${r.id}`;
+  const rowKey = (r: Row) => String(r.id);
 
   return (
     <div>
@@ -246,7 +197,7 @@ export default function LeaveManagementPage() {
       <div className="mb-4 flex gap-1 border-b">
         {(
           [
-            ["approval", "신청 승인"],
+            ["approval", "사전휴무 승인"],
             ["usage", "연차 사용 현황"],
           ] as const
         ).map(([key, label]) => (
@@ -269,8 +220,9 @@ export default function LeaveManagementPage() {
       {tab === "approval" ? (
         <>
           <p className="mb-4 text-sm text-gray-500">
-            연차·사전휴무 신청을 승인/반려할 수 있으며, 등록된 날짜는 자동배치 때
-            그 직원을 그 날 빼고 시작합니다.
+            사전휴무 신청을 승인/반려할 수 있으며, 등록된 날짜는 자동배치 때 그 직원을 그 날
+            빼고 시작합니다. 연차는 날짜로 신청하지 않고, 근무표 관리에서 자동배치를 돌릴 때
+            직원별 사용 개수를 정해요 (부여·조회는 “연차 사용 현황” 탭).
           </p>
 
           {!hasStaff && !loading && (
@@ -285,18 +237,6 @@ export default function LeaveManagementPage() {
             onSubmit={handleSubmit}
             className="mb-6 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4"
           >
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">구분</span>
-              <select
-                className={field}
-                value={form.kind}
-                onChange={(e) => setForm({ ...form, kind: e.target.value as Kind })}
-              >
-                <option value="leave">연차</option>
-                <option value="dayoff">사전휴무</option>
-              </select>
-            </label>
-
             <label className="flex flex-col gap-1 text-sm">
               <span className="font-medium">직원</span>
               <select
@@ -358,7 +298,7 @@ export default function LeaveManagementPage() {
                   {saving ? "저장 중…" : "신청 추가"}
                 </button>
 
-                {form.kind === "dayoff" && form.staff_id && (
+                {form.staff_id && (
                   <span
                     className={
                       "text-xs " +
@@ -387,7 +327,6 @@ export default function LeaveManagementPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-gray-50 text-left text-gray-500">
                 <tr>
-                  <th className="px-3 py-2">구분</th>
                   <th className="px-3 py-2">기간</th>
                   <th className="px-3 py-2">직원</th>
                   <th className="px-3 py-2">신청일</th>
@@ -399,33 +338,21 @@ export default function LeaveManagementPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                    <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
                       불러오는 중…
                     </td>
                   </tr>
                 ) : visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                    <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
                       {rows.length === 0
-                        ? "아직 등록된 신청이 없습니다."
+                        ? "아직 등록된 사전휴무 신청이 없습니다."
                         : "이 달에는 신청 내역이 없습니다."}
                     </td>
                   </tr>
                 ) : (
                   visibleRows.map((r) => (
                     <tr key={rowKey(r)} className="border-b last:border-0">
-                      <td className="px-3 py-2">
-                        <span
-                          className={
-                            "rounded px-1.5 py-0.5 text-xs font-medium " +
-                            (r.kind === "leave"
-                              ? "bg-[#B08968]/10 text-[#B08968]"
-                              : "bg-gray-100 text-gray-600")
-                          }
-                        >
-                          {KIND_LABEL[r.kind]}
-                        </span>
-                      </td>
                       <td className="px-3 py-2 font-medium whitespace-nowrap">
                         {fmtRange(r.start_date, r.end_date, r.days)}
                       </td>

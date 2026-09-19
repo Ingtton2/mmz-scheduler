@@ -73,11 +73,6 @@ export interface MyLeaveRequest extends MyRequest {
 
 export const listMyLeave = () => meGet<MyLeaveRequest[]>("/me/leave-requests");
 
-export const createMyLeave = (start_date: string, end_date: string, note?: string) =>
-  meSend<MyLeaveRequest>("POST", "/me/leave-requests", { start_date, end_date, note });
-
-export const cancelMyLeave = (id: number) =>
-  meSend<void>("DELETE", `/me/leave-requests/${id}`);
 
 export const listMyDayOff = () => meGet<MyRequest[]>("/me/dayoff-requests");
 

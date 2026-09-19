@@ -3,18 +3,19 @@
 
 - LeaveBalance : 직원별 연차 '잔액' 정보. 부여연차(누적)·사용연차(누적)만 저장하고
                  잔여연차는 저장하지 않고 그때그때 계산한다 (스펙: "자동 계산").
-- LeaveRequest : 직원이 미리 신청하는 연차 기간(시작일~종료일). 자동배치 시 최우선 고정.
-                 applied_at(신청일)은 실제로 쉬는 날짜(start_date~end_date)와는
-                 다른 값 — "언제 신청서를 냈는지"를 기록한다.
+- LeaveRequest : (과거 기록) 직원이 날짜로 신청하던 연차. 더는 새로 받지 않고, 자동배치에도
+                 영향을 주지 않는다 — 조회용으로만 남겨둔다.
+- MonthlyLeavePlan : 자동배치 실행 때 사장님이 정한 "직원별 그 달 연차 사용 개수". 실행할 때
+                 사용연차(LeaveBalance.used)에서 차감하고, 같은 달을 다시 돌리면 이전 값만큼
+                 되돌린 뒤 새 값으로 다시 차감한다.
 - LeaveGrantLog : "연차 관리 > 연차 사용 현황" 탭의 부여 이력. 부여연차(granted)를
                   올릴 때마다 한 줄씩 남긴다 (월차 자동부여/1주년 부여/기존 데이터 이관 등).
-- LeaveUsageLog : 같은 탭의 사용 이력. LeaveRequest(연차)가 "승인"으로 바뀔 때
-                  자동으로 한 줄 생기고, 승인이 취소되면 같이 지워진다.
+- LeaveUsageLog : (과거 기록) 예전 승인 방식의 사용 이력. 새 사용 이력은 MonthlyLeavePlan.
 """
 
 from datetime import date, datetime
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, UniqueConstraint
 
 from app.models.base import utcnow
 
@@ -80,4 +81,24 @@ class LeaveUsageLog(SQLModel, table=True):
     days: float             # 사용일수
     applied_at: date        # 신청일 (LeaveRequest.applied_at 그대로)
     remaining_after: float  # 이 사용을 반영한 뒤의 잔여연차
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class MonthlyLeavePlan(SQLModel, table=True):
+    """직원별 그 달 연차 사용 개수 (자동배치 실행 시 저장 + 사용연차 차감)."""
+
+    __tablename__ = "monthly_leave_plan"
+    __table_args__ = (
+        UniqueConstraint("store_id", "year", "month", "staff_id", name="uq_leave_plan_cell"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    store_id: int = Field(foreign_key="store.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+
+    year: int
+    month: int
+    days: int               # 실제로 배치된 연차 개수 (요청보다 적을 수 있음)
+    remaining_after: float  # 이 차감을 반영한 뒤의 잔여연차 (스냅샷)
+    applied_at: date = Field(default_factory=date.today)  # 마지막 자동배치 실행일
     created_at: datetime = Field(default_factory=utcnow)

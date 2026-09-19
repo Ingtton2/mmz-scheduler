@@ -156,8 +156,8 @@ def test_delete_hides_from_list(client: TestClient):
     assert "삭제될사람" not in [s["name"] for s in client.get("/api/staff").json()]
 
 
-def test_delete_preserves_leave_and_dayoff_history(client: TestClient):
-    """직원 삭제(is_active=False)는 목록에서만 숨기고, 연차/사전휴무 이력은
+def test_delete_preserves_dayoff_history(client: TestClient):
+    """직원 삭제(is_active=False)는 목록에서만 숨기고, 사전휴무 이력은
     그대로 남아 있어야 한다 (급여 정산·과거 스케줄 조회 대비 — 스펙 6.1)."""
     sid = client.post(
         "/api/staff",
@@ -169,10 +169,6 @@ def test_delete_preserves_leave_and_dayoff_history(client: TestClient):
         },
     ).json()["id"]
     client.post(
-        "/api/leave-requests",
-        json={"staff_id": sid, "start_date": "2026-11-10", "end_date": "2026-11-10"},
-    )
-    client.post(
         "/api/dayoff-requests",
         json={"staff_id": sid, "start_date": "2026-11-20", "end_date": "2026-11-20"},
     )
@@ -182,10 +178,8 @@ def test_delete_preserves_leave_and_dayoff_history(client: TestClient):
     # 직원 목록에선 사라짐.
     assert "이력보존직원" not in [s["name"] for s in client.get("/api/staff").json()]
 
-    # 그러나 연차/사전휴무 신청 기록은 이름과 함께 그대로 남아 있음 (하드 삭제 안 됨).
-    leave_names = [r["staff_name"] for r in client.get("/api/leave-requests").json()]
+    # 그러나 사전휴무 신청 기록은 이름과 함께 그대로 남아 있음 (하드 삭제 안 됨).
     dayoff_names = [r["staff_name"] for r in client.get("/api/dayoff-requests").json()]
-    assert "이력보존직원" in leave_names
     assert "이력보존직원" in dayoff_names
 
 

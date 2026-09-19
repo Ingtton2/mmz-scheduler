@@ -10,9 +10,12 @@ import { getHolidays } from "../api/holiday";
 import {
   EDIT_CODES,
   editScheduleEntries,
+  getLeavePlan,
   getSavedSchedule,
   runAutoSchedule,
   shareSchedule,
+  type LeaveDays,
+  type LeavePlanRow,
   type ScheduleResult,
   type ScheduleRow,
 } from "../api/schedule";
@@ -99,6 +102,9 @@ export default function SchedulePage() {
   const [month, setMonth] = useState(NEXT_MONTH);
   const [result, setResult] = useState<ScheduleResult | null>(null);
   const [running, setRunning] = useState(false);
+  // 직원별 "이번 달 연차 사용 개수" 입력 (자동배치가 날짜를 랜덤으로 골라 넣음)
+  const [leavePlan, setLeavePlan] = useState<LeavePlanRow[]>([]);
+  const [leaveInputs, setLeaveInputs] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -155,11 +161,47 @@ export default function SchedulePage() {
       });
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    getLeavePlan(year, month)
+      .then((rows) => {
+        if (cancelled) return;
+        setLeavePlan(rows);
+        const next: Record<number, string> = {};
+        for (const r of rows) next[r.staff_id] = r.saved_days > 0 ? String(r.saved_days) : "";
+        setLeaveInputs(next);
+      })
+      .catch(() => {
+        if (!cancelled) setLeavePlan([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [year, month]);
+
+  // 입력값 -> 개수. 비었으면 0, 음수/소수/잔여 초과면 오류 메시지.
+  function leaveInputError(r: LeavePlanRow): string {
+    const raw = (leaveInputs[r.staff_id] ?? "").trim();
+    if (raw === "") return "";
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0) return "0 이상 정수";
+    if (n > r.remaining) return "잔여 초과";
+    return "";
+  }
+  const leaveHasError = leavePlan.some((r) => leaveInputError(r) !== "");
+
   async function handleRun() {
+    const leaveDays: LeaveDays = {};
+    for (const r of leavePlan) {
+      const n = Number((leaveInputs[r.staff_id] ?? "").trim() || "0");
+      if (n > 0) leaveDays[r.staff_id] = n;
+    }
     setRunning(true);
     resetTransient();
     try {
-      setResult(await runAutoSchedule(year, month));
+      setResult(await runAutoSchedule(year, month, leaveDays));
+      // 실행하면 사용연차가 차감되므로 잔여/저장 개수를 다시 불러온다
+      getLeavePlan(year, month).then(setLeavePlan).catch(() => {});
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -270,7 +312,8 @@ export default function SchedulePage() {
       </p>
 
       {/* 컨트롤 */}
-      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border bg-white p-4">
+      <div className="mb-4 space-y-4 rounded-lg border bg-white p-4">
+        <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-xs text-gray-600">연도</span>
           <select
@@ -299,9 +342,64 @@ export default function SchedulePage() {
             ))}
           </select>
         </label>
+        </div>
+
+        {/* 이번 달 연차 사용 개수: [잔여연차] [이름] [개수] — 날짜는 자동배치가 랜덤으로 골라 넣는다 */}
+        {leavePlan.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex flex-wrap items-baseline gap-2">
+              <h2 className="text-sm font-semibold text-gray-700">이번 달 연차 사용 개수</h2>
+              <span className="text-xs text-gray-400">
+                적은 개수만큼 자동배치가 인원이 부족하지 않은 날에 알아서 넣습니다. 실행하면
+                사용연차에서 차감돼요.
+              </span>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {leavePlan.map((r) => {
+                const err = leaveInputError(r);
+                return (
+                  <li
+                    key={r.staff_id}
+                    className="flex items-center gap-2 rounded border bg-gray-50 px-3 py-2"
+                  >
+                    <span
+                      className="w-14 shrink-0 rounded bg-white px-1.5 py-0.5 text-center text-xs text-gray-600"
+                      title="사용 가능한 잔여연차"
+                    >
+                      잔여 {Number.isInteger(r.remaining) ? r.remaining : r.remaining.toFixed(1)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {r.staff_name}
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      value={leaveInputs[r.staff_id] ?? ""}
+                      onChange={(e) =>
+                        setLeaveInputs((prev) => ({ ...prev, [r.staff_id]: e.target.value }))
+                      }
+                      placeholder="0"
+                      className={
+                        "w-16 rounded border px-2 py-1.5 text-right text-base sm:text-sm " +
+                        (err ? "border-red-400" : "border-gray-300")
+                      }
+                    />
+                    <span className="min-w-8 shrink-0 whitespace-nowrap text-xs text-gray-500">
+                      {err ? <span className="text-red-600">{err}</span> : "개"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-end gap-3">
         <button
           onClick={handleRun}
-          disabled={running || isAutoScheduleBlocked(year, month)}
+          disabled={running || leaveHasError || isAutoScheduleBlocked(year, month)}
           title={
             isAutoScheduleBlocked(year, month)
               ? "이번 달과 그 이전 달은 자동배치를 다시 실행할 수 없습니다. 다음 달 스케줄부터 가능해요."
@@ -361,6 +459,7 @@ export default function SchedulePage() {
             )}
           </span>
         )}
+        </div>
       </div>
 
       {isAutoScheduleBlocked(year, month) && (

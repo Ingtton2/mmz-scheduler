@@ -72,8 +72,22 @@ export const EDIT_CODES = [
   "사휴",
 ] as const;
 
-export const runAutoSchedule = (year: number, month: number) =>
-  apiSend<ScheduleResult>("POST", "/schedule/auto", { year, month });
+// 직원별 이번 달 연차 사용 개수 (직원 id -> 개수). 날짜는 자동배치가 알아서 고른다.
+export type LeaveDays = Record<number, number>;
+
+export const runAutoSchedule = (year: number, month: number, leaveDays: LeaveDays = {}) =>
+  apiSend<ScheduleResult>("POST", "/schedule/auto", { year, month, leave_days: leaveDays });
+
+// 자동배치 화면의 연차 입력 패널용: 직원별 사용 가능한 잔여연차 + 이 달에 저장된 개수
+export interface LeavePlanRow {
+  staff_id: number;
+  staff_name: string;
+  remaining: number;
+  saved_days: number;
+}
+
+export const getLeavePlan = (year: number, month: number) =>
+  apiGet<LeavePlanRow[]>(`/schedule/leave-plan?year=${year}&month=${month}`);
 
 export const editScheduleEntries = (
   year: number,

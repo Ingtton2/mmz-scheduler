@@ -11,7 +11,8 @@
   LeaveBalance        직원 연차 정보
   LeaveRequest        직원 연차 신청
   LeaveGrantLog       연차 부여 이력
-  LeaveUsageLog       연차 사용 이력 (연차 승인 시 자동 기록)
+  LeaveUsageLog       (과거) 연차 승인 방식의 사용 이력
+  MonthlyLeavePlan    직원별 그 달 연차 사용 개수 (자동배치 실행 시 차감)
   DayOffRequest       직원 사전 휴무 신청 (연차와 별개, 월 20일)
   StaffingRequirement 요일·시간대별 필요 인원
   Schedule            월 스케줄 (공유코드 = QR 대상)
@@ -30,7 +31,13 @@ from app.models.enums import (
 from app.models.dayoff import MAX_PER_MONTH, DayOffRequest
 from app.models.holiday import Holiday
 from app.models.kitchen_rotation import KitchenRotationAssignment
-from app.models.leave import LeaveBalance, LeaveGrantLog, LeaveRequest, LeaveUsageLog
+from app.models.leave import (
+    LeaveBalance,
+    LeaveGrantLog,
+    LeaveRequest,
+    LeaveUsageLog,
+    MonthlyLeavePlan,
+)
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
 from app.models.staff_account import StaffAccount
@@ -50,6 +57,7 @@ __all__ = [
     "LeaveRequest",
     "LeaveRequestStatus",
     "LeaveUsageLog",
+    "MonthlyLeavePlan",
     "Position",
     "Schedule",
     "ScheduleEntry",
