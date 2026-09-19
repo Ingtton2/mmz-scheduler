@@ -15,6 +15,7 @@ import {
 import { signup } from "../api/me";
 import { MeApiError } from "../api/meClient";
 import { LABEL } from "../labels";
+import { fmtKstDate } from "../utils/format";
 
 export default function StaffAccountsPage() {
   const [pending, setPending] = useState<PendingAccount[]>([]);
@@ -220,7 +221,7 @@ export default function StaffAccountsPage() {
                   <td className="px-3 py-2">{LABEL.role[p.role] ?? p.role}</td>
                   <td className="px-3 py-2">{LABEL.position[p.position] ?? p.position}</td>
                   <td className="px-3 py-2 text-gray-500">
-                    {p.created_at.slice(0, 10)}
+                    {fmtKstDate(p.created_at)}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button
@@ -284,7 +285,7 @@ export default function StaffAccountsPage() {
                 <tr key={a.account_id} className="border-b last:border-0">
                   <td className="px-3 py-2 font-medium">{a.staff_name}</td>
                   <td className="px-3 py-2 text-gray-500">
-                    {(a.approved_at ?? a.created_at).slice(0, 10)}
+                    {fmtKstDate(a.approved_at ?? a.created_at)}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

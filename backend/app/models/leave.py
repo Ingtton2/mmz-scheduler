@@ -17,7 +17,7 @@ from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
-from app.models.base import utcnow
+from app.models.base import today_kst, utcnow
 
 
 class LeaveBalance(SQLModel, table=True):
@@ -44,7 +44,7 @@ class LeaveRequest(SQLModel, table=True):
 
     start_date: date                       # 연차 시작일 (쉬는 날)
     end_date: date                         # 연차 종료일 (포함). 하루면 start == end
-    applied_at: date = Field(default_factory=date.today)  # 신청일
+    applied_at: date = Field(default_factory=today_kst)  # 신청일
     status: str = "requested"              # LeaveRequestStatus: requested / confirmed
     note: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
@@ -59,7 +59,7 @@ class LeaveGrantLog(SQLModel, table=True):
     store_id: int = Field(foreign_key="store.id", index=True)
     staff_id: int = Field(foreign_key="staff.id", index=True)
 
-    granted_at: date = Field(default_factory=date.today)  # 부여일
+    granted_at: date = Field(default_factory=today_kst)  # 부여일
     days: float                                           # 부여일수
     note: str | None = None                               # "월차 자동부여" / "1주년 연차부여" / "기존 데이터 이관" 등
     created_at: datetime = Field(default_factory=utcnow)
@@ -100,5 +100,5 @@ class MonthlyLeavePlan(SQLModel, table=True):
     month: int
     days: int               # 실제로 배치된 연차 개수 (요청보다 적을 수 있음)
     remaining_after: float  # 이 차감을 반영한 뒤의 잔여연차 (스냅샷)
-    applied_at: date = Field(default_factory=date.today)  # 마지막 자동배치 실행일
+    applied_at: date = Field(default_factory=today_kst)  # 마지막 자동배치 실행일
     created_at: datetime = Field(default_factory=utcnow)

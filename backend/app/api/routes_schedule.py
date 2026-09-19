@@ -30,7 +30,7 @@ from app.models import (
     StaffingRequirement,
     Store,
 )
-from app.models.base import date_range, utcnow
+from app.models.base import date_range, today_kst, utcnow
 from app.scheduler.engine import WORK_CODES, SolveInput, StaffInput, build_schedule
 from app.schemas.staff import has_leave_balance
 from app.services.headcount_check import check_headcount
@@ -53,8 +53,8 @@ router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
 def _today() -> date:
-    """테스트에서 monkeypatch 하기 쉽게 date.today() 를 함수로 감싼다."""
-    return date.today()
+    """테스트에서 monkeypatch 하기 쉽게 오늘 날짜(KST)를 함수로 감싼다."""
+    return today_kst()
 
 
 def _load_active_staff(session: Session) -> list[Staff]:
@@ -274,7 +274,7 @@ def _apply_leave_plan(
         else:
             plan.days = new
             plan.remaining_after = remaining_after
-            plan.applied_at = date.today()
+            plan.applied_at = today_kst()
         session.add(plan)
 
 
@@ -300,7 +300,7 @@ def _adjust_leave(session: Session, s: Staff, year: int, month: int, delta: int)
         )
     plan.days = max(0, plan.days + delta)
     plan.remaining_after = round(bal.granted - bal.used, 2)
-    plan.applied_at = date.today()
+    plan.applied_at = today_kst()
     session.add(plan)
 
 

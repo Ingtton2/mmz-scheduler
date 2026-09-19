@@ -28,18 +28,13 @@ import {
   type ScheduleRow,
 } from "../api/schedule";
 import { LABEL } from "../labels";
+import { fmtKstDateTime } from "../utils/format";
 
 const WD_CHAR = ["일", "월", "화", "수", "목", "금", "토"];
 
 function parseWd(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).getDay(); // 0=일 ~ 6=토
-}
-
-function fmtPublishedAt(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 // 저장된 코드 -> 화면 표시(뱃지). 근무 코드마다 서로 다른 색 (memeal.zip 디자인 시스템).
@@ -595,7 +590,7 @@ export default function SchedulePage() {
         )}
         {result?.status === "confirmed" && result.published_at && (
           <span className="text-xs text-gray-400">
-            {fmtPublishedAt(result.published_at)} 공개
+            {fmtKstDateTime(result.published_at)} 공개
           </span>
         )}
         {result?.saved && (

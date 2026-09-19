@@ -23,6 +23,7 @@ from app.models import (
     ScheduleEntry,
     Staff,
 )
+from app.models.base import today_kst
 from app.schemas.leave_usage import (
     GrantCandidate,
     LeaveGrantCreate,
@@ -37,7 +38,7 @@ router = APIRouter(prefix="/leave", tags=["leave-usage"])
 
 @router.get("/grant-candidates", response_model=list[GrantCandidate])
 def grant_candidates(session: Session = Depends(get_session)) -> list[GrantCandidate]:
-    return [GrantCandidate(**c) for c in list_grant_candidates(session, date.today())]
+    return [GrantCandidate(**c) for c in list_grant_candidates(session, today_kst())]
 
 
 @router.post("/grants", response_model=LeaveGrantRead, status_code=201)
@@ -61,7 +62,7 @@ def create_grant(
     log = LeaveGrantLog(
         store_id=DEFAULT_STORE_ID,
         staff_id=staff.id,
-        granted_at=payload.granted_at or date.today(),
+        granted_at=payload.granted_at or today_kst(),
         days=payload.days,
         note=payload.note,
     )

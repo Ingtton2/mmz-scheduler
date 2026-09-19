@@ -11,6 +11,7 @@ from datetime import date
 from sqlmodel import Session, select
 
 from app.models import DEFAULT_STORE_ID, Schedule, ScheduleEntry, Staff, Store
+from app.models.base import today_kst
 from app.schemas.schedule import PublicRow, PublicScheduleResult
 from app.services.schedule_window import within_employee_visible_range
 
@@ -60,7 +61,7 @@ def get_confirmed_schedule(
     (과거+당월+다음달) 안일 때만 돌려준다. 범위를 벗어나면 공유 상태와
     무관하게 항상 None — 안전장치."""
     if today is None:
-        today = date.today()
+        today = today_kst()
     if not within_employee_visible_range(year, month, today):
         return None
     sched = session.exec(

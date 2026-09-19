@@ -17,6 +17,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import MAX_PER_MONTH, DEFAULT_STORE_ID, DayOffRequest, Staff
+from app.models.base import today_kst
 from app.schemas.dayoff import DayOffRequestCreate, DayOffRequestRead, DayOffRequestUpdate
 from app.services.date_overlap import days_by_month, overlaps as _overlaps
 
@@ -94,7 +95,7 @@ def create_request(
         staff_id=payload.staff_id,
         start_date=payload.start_date,
         end_date=payload.end_date,
-        applied_at=payload.applied_at or date.today(),
+        applied_at=payload.applied_at or today_kst(),
         status=payload.status.value,
         note=(payload.note or None),
     )
