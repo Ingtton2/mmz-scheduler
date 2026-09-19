@@ -137,6 +137,9 @@ class SolveInput:
     # 포지션x슬롯 필요인원과 별개 규칙 — 파트타임이 하루 종일 근무하며 슬롯을
     # 여러 개 혼자 채워도, 실제 출근 "머릿수"는 이 값을 목표로 맞춘다 (소프트).
     daily_headcount_target: int = 0
+    # 전달 말일 기준 직원별 연속 근무 일수 (직원 id -> 일수, 5까지만 의미 있음).
+    # 없으면 0. 이번 달 1일부터 이어지는 연속근무 제한 계산에 쓴다.
+    prev_tail_streak: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -172,7 +175,9 @@ def _req(inp: SolveInput, weekday: int, position: str, slot: str) -> int:
     )
 
 
-def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResult:
+def build_schedule(
+    inp: SolveInput, *, time_limit_s: float = 12.0, _hard_streak: bool = True
+) -> SolveResult:
     days = _month_days(inp.year, inp.month)
     staff = inp.staff
     n_days = len(days)
@@ -534,17 +539,26 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
     for s in staff:
         m.Add(workdays(s.id) <= peak)
 
-    # --- 6일 이상 연속 근무 회피 (소프트) ---
-    #   6일 연속 창(window) 마다 벌점. 7일 연속이면 2개 창이 걸려 더 큰 벌점 → 길수록 강하게 회피.
-    #   달 경계는 고려하지 않음 (그 달 안에서만 계산).
+    # --- 6일 이상 연속 근무 금지 (하드) ---
+    #   6일짜리 창 어디서나 근무 합계 <= 5. 전달 말일부터 이어지는 연속도 포함 (전달 근무는
+    #   상수로 취급). 고정근무(fixed) 직원은 "항상 배치"가 우선이라 하드 대신 소프트 벌점.
+    #   (관리책임자 하드 규칙 등으로 하드가 도저히 불가능하면 _hard_streak=False 로 재시도)
     MAX_STREAK = 5
     streak_viol: list[cp_model.IntVar] = []
     for s in staff:
-        for a in range(n_days - MAX_STREAK):
-            win = [work[(s.id, di)] for di in range(a, a + MAX_STREAK + 1)]
-            v = m.NewIntVar(0, 1, f"streak_{s.id}_{a}")
-            m.Add(v >= sum(win) - MAX_STREAK)
-            streak_viol.append(v)
+        tail = min(inp.prev_tail_streak.get(s.id, 0), MAX_STREAK)
+        for a in range(-MAX_STREAK, n_days - MAX_STREAK):
+            prior = sum(1 for j in range(a, min(a + MAX_STREAK + 1, 0)) if j >= -tail)
+            win = [
+                work[(s.id, di)]
+                for di in range(max(a, 0), a + MAX_STREAK + 1)
+            ]
+            if _hard_streak and not s.fixed:
+                m.Add(sum(win) + prior <= MAX_STREAK)
+            else:
+                v = m.NewIntVar(0, 1, f"streak_{s.id}_{a}")
+                m.Add(v >= sum(win) + prior - MAX_STREAK)
+                streak_viol.append(v)
 
     # === 목표 (스펙 5 우선순위) ===
     # CP-SAT 속도를 위해 계단식이 아닌 '적당히 벌어진' 가중치를 쓴다.
@@ -630,6 +644,17 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
         )
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        if _hard_streak:
+            # 연속근무 하드 제한 때문에 해가 없으면 소프트로 다시 풀고 경고로 알린다.
+            retry = build_schedule(inp, time_limit_s=time_limit_s, _hard_streak=False)
+            retry.warnings.insert(
+                0,
+                SolveWarning(
+                    "", "연속근무", MAX_STREAK, 0,
+                    "6일 연속근무 금지 조건을 지키면 배치가 불가능해 이번엔 완화했습니다 — 아래 연속근무 경고를 확인하세요",
+                ),
+            )
+            return retry
         result.warnings.append(
             SolveWarning("", "", 0, 0, "해를 찾지 못했습니다. 설정을 확인해주세요.")
         )
@@ -834,10 +859,10 @@ def build_schedule(inp: SolveInput, *, time_limit_s: float = 12.0) -> SolveResul
 
     # --- 경고: 6일 이상 연속 근무 (불가피하게 발생한 경우) ---
     for s in staff:
-        run = 0
-        best = 0
-        run_start = ""
-        best_range = ("", "")
+        run = min(inp.prev_tail_streak.get(s.id, 0), MAX_STREAK)
+        best = run
+        run_start = "전달"
+        best_range = ("전달", "")
         for di, d in enumerate(days):
             if result.entries[s.id][d.isoformat()] in WORK_CODES:
                 if run == 0:

@@ -467,8 +467,6 @@ def test_offday_fairness_pulls_owner_into_weekend_when_needed():
         StaffInput(2, "사장", "kitchen", role="owner"),
     ]
     r = build_schedule(SolveInput(2026, 9, staff, requirements=req))
-    assert r.feasible or all("연속" in w.message for w in r.warnings)
-
     wh_days = [d for d in r.days if date.fromisoformat(d).weekday() >= 5]
     mgr_wh_off = sum(1 for d in wh_days if r.entries[1][d] not in WORK)
     assert mgr_wh_off >= 2, mgr_wh_off
@@ -503,8 +501,9 @@ def test_no_6day_streak_when_slack():
     assert not any("연속 근무" in w.message for w in r.warnings)
 
 
-def test_6day_streak_allowed_with_warning_when_tight():
-    # 홀 전담 1명뿐인데 홀 오픈/마감 각 1 필요 -> 그 사람이 매일 나와야 함 -> 긴 연속근무
+def test_6day_streak_forbidden_shortage_warning_instead_when_tight():
+    # 홀 전담 1명뿐인데 홀 오픈/마감 각 1 필요 -> 예전엔 그 사람이 매일 나와 긴 연속근무.
+    # 이제 연속근무 6일째는 하드 금지라, 대신 홀 인원 부족 경고가 뜬다.
     staff = [
         StaffInput(1, "홀A", "hall"),           # min_days_off 0 -> 근무일수 제한 없음
         StaffInput(2, "주1", "kitchen"),
@@ -512,10 +511,9 @@ def test_6day_streak_allowed_with_warning_when_tight():
         StaffInput(4, "주3", "kitchen"),
     ]
     r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
-    # 자동배치는 멈추지 않는다
-    assert r.entries  # 결과가 나옴
-    assert _max_streak(r.entries[1]) >= 6
-    assert any("연속 근무" in w.message and "홀A" in w.message for w in r.warnings)
+    assert r.entries  # 자동배치는 멈추지 않는다
+    assert _max_streak(r.entries[1]) <= 5
+    assert any(w.position.startswith("홀") for w in r.warnings)
 
 
 def test_codes_reveal_position():
@@ -656,7 +654,7 @@ def test_rotation_soft_when_person_on_leave_only_that_day_is_covered():
     assert r.entries[4]["2026-09-04"] == CODE_LEAVE
     # 그날 마감은 다른 사람이 채움 (희명이 연차라도 필요인원 자체는 그대로)
     others_filled = any(
-        r.entries[sid]["2026-09-03"] == CODE_BC for sid in (8, 9)
+        r.entries[sid]["2026-09-03"] == CODE_BC for sid in r.entries if sid != 4
     )
     assert others_filled
 
@@ -731,17 +729,68 @@ def test_leave_dates_vary_with_seed():
 
 
 def test_leave_not_placed_when_it_would_cause_shortage():
-    """필요인원이 딱 맞는 팀에선 연차를 넣으면 인원이 모자라진다 — 이땐 연차를 덜 넣는다."""
-    # 홀 전담 2명이 오픈·마감 각 1명씩 매일 필요 -> 둘 다 매일 나와야 하는 구성
+    """필요인원이 딱 맞는 팀에선 연차가 인원 부족을 늘리면 안 된다 — 연속근무 금지로
+    어차피 쉬어야 하는 날에만 연차가 들어가서, 연차 유무와 관계없이 부족 건수가 같다."""
     staff = [
         StaffInput(1, "홀A", "hall", min_days_off=0),
         StaffInput(2, "홀B", "hall", min_days_off=0),
     ]
+    base = build_schedule(SolveInput(2026, 9, staff, requirements=HALL_OC))
     r = build_schedule(
         SolveInput(2026, 9, staff, requirements=HALL_OC, leave_counts={1: 3}, random_seed=1)
     )
-    assert r.leave_placed.get(1, 0) == 0
-    assert not any(v == CODE_LEAVE for v in r.entries[1].values())
-    assert any(w.position == "연차" for w in r.warnings)
-    # 필요인원은 그대로 채워짐
-    assert not any("오픈" in w.position or "마감" in w.position for w in r.warnings)
+
+    def short(res):
+        return sum(1 for w in res.warnings if w.position.startswith("홀"))
+
+    assert short(r) == short(base)
+    assert r.leave_placed.get(1, 0) == 3
+
+
+# --- 연속근무 하드 제한 (6일째 금지, 전달 말일 이어짐 포함) ---
+
+
+def _max_run(cells: dict[str, str]) -> int:
+    run = best = 0
+    for k in sorted(cells):
+        run = run + 1 if cells[k] in WORK else 0
+        best = max(best, run)
+    return best
+
+
+def test_streak_hard_no_six_day_run():
+    staff = _base_team()
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    assert all(_max_run(r.entries[s.id]) <= 5 for s in staff)
+
+
+def test_streak_continues_from_previous_month():
+    # 전달 말일까지 5일 연속 근무한 직원 -> 이번 달 1일은 반드시 휴무
+    staff = _base_team()
+    tail = {s.id: 5 for s in staff[:3]}
+    r = build_schedule(
+        SolveInput(2026, 9, staff, requirements=BASIC, prev_tail_streak=tail)
+    )
+    for sid in tail:
+        assert r.entries[sid]["2026-09-01"] not in WORK
+    # 4일 연속이면 1일은 근무해도 되지만 2일째까지만 (합쳐 5일 이하)
+    tail4 = {staff[3].id: 4}
+    r = build_schedule(
+        SolveInput(2026, 9, staff, requirements=BASIC, prev_tail_streak=tail4)
+    )
+    cells = r.entries[staff[3].id]
+    lead = 0
+    for k in sorted(cells):
+        if cells[k] in WORK:
+            lead += 1
+        else:
+            break
+    assert lead <= 1
+
+
+def test_streak_falls_back_to_soft_when_impossible():
+    # 관리책임자(점장) 1명뿐 -> 매일 출근 하드 규칙 때문에 연속근무 하드는 불가능
+    staff = _base_team() + [StaffInput(20, "점장", "both", role="manager", min_days_off=8)]
+    r = build_schedule(SolveInput(2026, 9, staff, requirements=BASIC))
+    assert r.entries  # 해를 못 찾아 빈 결과가 되면 안 됨
+    assert any(w.position == "연속근무" for w in r.warnings)

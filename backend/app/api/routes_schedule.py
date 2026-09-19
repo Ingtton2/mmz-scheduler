@@ -31,7 +31,7 @@ from app.models import (
     Store,
 )
 from app.models.base import date_range, utcnow
-from app.scheduler.engine import SolveInput, StaffInput, build_schedule
+from app.scheduler.engine import WORK_CODES, SolveInput, StaffInput, build_schedule
 from app.schemas.staff import has_leave_balance
 from app.services.headcount_check import check_headcount
 from app.services.schedule_summary import summarize as _summarize
@@ -104,6 +104,41 @@ def _load_requirements(session: Session) -> dict[int, dict[str, dict[str, int]]]
 def _load_daily_headcount_target(session: Session) -> int:
     store = session.get(Store, DEFAULT_STORE_ID)
     return store.daily_headcount_target if store else 0
+
+
+def _load_prev_tail_streak(session: Session, year: int, month: int) -> dict[int, int]:
+    """전달 말일 기준 직원별 연속 근무 일수 (최대 5까지만 센다). 전달 근무표가 없으면 빈 dict."""
+    py, pm = (year - 1, 12) if month == 1 else (year, month - 1)
+    sched = session.exec(
+        select(Schedule).where(
+            Schedule.store_id == DEFAULT_STORE_ID,
+            Schedule.year == py,
+            Schedule.month == pm,
+        )
+    ).first()
+    if sched is None:
+        return {}
+    last = calendar.monthrange(py, pm)[1]
+    rows = session.exec(
+        select(ScheduleEntry).where(
+            ScheduleEntry.schedule_id == sched.id,
+            ScheduleEntry.work_date >= date(py, pm, max(last - 4, 1)),
+        )
+    ).all()
+    by_staff: dict[int, dict[date, str]] = {}
+    for r in rows:
+        by_staff.setdefault(r.staff_id, {})[r.work_date] = r.work_code
+    out: dict[int, int] = {}
+    for sid, cells in by_staff.items():
+        run = 0
+        for day in range(last, max(last - 5, 0), -1):
+            if cells.get(date(py, pm, day)) in WORK_CODES:
+                run += 1
+            else:
+                break
+        if run:
+            out[sid] = run
+    return out
 
 
 def _load_holiday_dates(session: Session, year: int, month: int) -> set[date]:
@@ -351,6 +386,7 @@ def run_auto_schedule(
         holiday_dates=_load_holiday_dates(session, payload.year, payload.month),
         requirements=_load_requirements(session),
         daily_headcount_target=_load_daily_headcount_target(session),
+        prev_tail_streak=_load_prev_tail_streak(session, payload.year, payload.month),
     )
 
     solved = build_schedule(inp)
