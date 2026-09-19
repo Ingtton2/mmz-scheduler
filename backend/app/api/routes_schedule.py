@@ -282,7 +282,11 @@ def get_leave_plan(
         available, saved = _available_leave(session, s, year, month)
         rows.append(
             LeavePlanRow(
-                staff_id=s.id, staff_name=s.name, remaining=round(available, 2), saved_days=saved
+                staff_id=s.id,
+                staff_name=s.name,
+                remaining=round(available - saved, 2),
+                saved_days=saved,
+                max_days=round(available, 2),
             )
         )
     return rows

@@ -111,7 +111,8 @@ def test_leave_plan_endpoint_and_usage_log(client: TestClient, monkeypatch):
     assert "파트" not in names and "주1" in names
     row = next(p for p in plan if p["staff_id"] == ids["주1"])
     assert row["saved_days"] == 2
-    assert row["remaining"] == 5  # 이 달에 이미 차감된 2개는 다시 돌릴 때 쓸 수 있는 몫에 포함
+    assert row["remaining"] == 3  # 실제 잔여 (연차 사용 현황과 같은 값)
+    assert row["max_days"] == 5  # 이 달에 이미 차감된 2개는 다시 돌릴 때 되돌려지므로 지정 가능 최대치에 포함
 
     usage = client.get("/api/leave/usage-log").json()
     u = next(x for x in usage if x["staff_id"] == ids["주1"])

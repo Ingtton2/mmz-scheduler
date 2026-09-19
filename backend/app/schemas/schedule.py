@@ -22,8 +22,9 @@ class AutoScheduleRequest(BaseModel):
 class LeavePlanRow(BaseModel):
     staff_id: int
     staff_name: str
-    remaining: float   # 이번 달에 쓸 수 있는 잔여연차 (이 달에 이미 차감된 분은 되돌려서 계산)
-    saved_days: int    # 이 달에 저장된 연차 개수
+    remaining: float   # 실제 잔여연차 (부여 - 사용). 연차 사용 현황 탭과 같은 값
+    saved_days: int    # 이 달에 이미 차감돼 저장된 연차 개수
+    max_days: float    # 이번 달에 지정할 수 있는 최대 개수 = 잔여 + 이 달 저장분 (다시 돌리면 되돌려지므로)
 
 
 class ScheduleWarningOut(BaseModel):

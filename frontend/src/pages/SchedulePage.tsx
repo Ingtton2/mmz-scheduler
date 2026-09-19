@@ -221,7 +221,7 @@ export default function SchedulePage() {
     if (raw === "") return "";
     const n = Number(raw);
     if (!Number.isInteger(n) || n < 0) return "0 이상 정수";
-    if (n > r.remaining) return "잔여 초과";
+    if (n > r.max_days) return "잔여 초과";
     return "";
   }
   const leaveHasError = leavePlan.some((r) => leaveInputError(r) !== "");

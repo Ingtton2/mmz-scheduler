@@ -82,8 +82,9 @@ export const runAutoSchedule = (year: number, month: number, leaveDays: LeaveDay
 export interface LeavePlanRow {
   staff_id: number;
   staff_name: string;
-  remaining: number;
+  remaining: number; // 실제 잔여연차 (연차 사용 현황과 같은 값)
   saved_days: number;
+  max_days: number; // 이번 달에 지정할 수 있는 최대 개수 (잔여 + 이 달 저장분)
 }
 
 export const getLeavePlan = (year: number, month: number) =>
