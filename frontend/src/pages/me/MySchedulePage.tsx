@@ -41,6 +41,7 @@ export default function MySchedulePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const todayIso = todayKst().iso;
+  const isCurrentMonth = `${year}-${pad(month)}` === todayIso.slice(0, 7);
   const cells = calendarCells(year, month);
   // 공휴일(날짜 -> 이름). 표시 전용이라 못 불러와도 달력은 그대로 보여준다.
   const [holidays, setHolidays] = useState<Record<string, string>>({});
@@ -83,6 +84,13 @@ export default function MySchedulePage() {
           className="rounded border px-2 py-1 text-sm hover:bg-gray-50"
         >
           다음달 →
+        </button>
+        <button
+          onClick={() => setYm(thisYm())}
+          disabled={isCurrentMonth}
+          className="rounded border border-[#B08968] px-2 py-1 text-sm font-medium text-[#B08968] hover:bg-amber-50 disabled:cursor-default disabled:border-gray-200 disabled:text-gray-300 disabled:hover:bg-transparent"
+        >
+          오늘
         </button>
       </div>
 
