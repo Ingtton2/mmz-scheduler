@@ -18,6 +18,7 @@
   Schedule            월 스케줄 (공유코드 = QR 대상)
   ScheduleEntry       스케줄 한 칸
   KitchenRotationAssignment  주방 오픈/미들/마감 3인 로테이션의 그 달 담당
+  PersonalScheduleNote  휴가 일정 공유 메모판 (직원 1명당 1줄, 순수 참고용)
 """
 
 from app.models.enums import (
@@ -42,12 +43,14 @@ from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
 from app.models.staff_account import StaffAccount
 from app.models.staffing import StaffingRequirement
+from app.models.vacation_note import MEMO_MAX, PersonalScheduleNote
 from app.models.store import DEFAULT_STORE_ID, Store
 from app.models.work_code import WorkCode
 
 __all__ = [
     "DEFAULT_STORE_ID",
     "MAX_PER_MONTH",
+    "MEMO_MAX",
     "DayOffRequest",
     "EmploymentType",
     "Holiday",
@@ -58,6 +61,7 @@ __all__ = [
     "LeaveRequestStatus",
     "LeaveUsageLog",
     "MonthlyLeavePlan",
+    "PersonalScheduleNote",
     "Position",
     "Schedule",
     "ScheduleEntry",

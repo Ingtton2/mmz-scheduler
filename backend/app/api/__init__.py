@@ -23,6 +23,7 @@ from app.api import (
     routes_staff,
     routes_staff_accounts,
     routes_staffing,
+    routes_vacation_notes,
 )
 
 api_router = APIRouter()
@@ -38,3 +39,5 @@ api_router.include_router(routes_schedule.router)
 api_router.include_router(routes_public_accounts.router)
 api_router.include_router(routes_staff_accounts.router)
 api_router.include_router(routes_me.router)
+api_router.include_router(routes_vacation_notes.me_router)
+api_router.include_router(routes_vacation_notes.router)

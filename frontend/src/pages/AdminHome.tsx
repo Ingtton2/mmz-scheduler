@@ -28,6 +28,12 @@ const MENU = [
     desc: "가입 승인 · PIN 초기화",
     to: "/admin/accounts",
   },
+  {
+    key: "vacation-notes",
+    label: "휴가 일정 공유",
+    desc: "직원들이 미리 적어둔 개인 일정 보기",
+    to: "/admin/vacation-notes",
+  },
   { key: "work-codes", label: "근무 코드 설정", step: "다음 단계" },
 ];
 

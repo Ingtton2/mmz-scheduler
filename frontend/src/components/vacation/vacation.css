@@ -1,0 +1,122 @@
+/* 휴가 일정 공유 — 이 기능만의 별도 톤 (프로토타입 그대로). 본 앱 브랜드 컬러와 의도적으로 다름.
+   모든 규칙은 .vn 안으로 한정해서 다른 화면에 새지 않게 한다. */
+.vn,
+html.vn-active {
+  --vn-bg: #f6f1ec; --vn-surface: #ffffff; --vn-ink: #3b2f26; --vn-muted: #8e7d6f; --vn-line: #ece2d8;
+  --vn-tint: #f3eae1; --vn-chip: #ede0d4; --vn-accent: #b08968; --vn-accent-deep: #7f5539; --vn-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  .vn,
+  html.vn-active {
+    --vn-bg: #1c1713; --vn-surface: #26201b; --vn-ink: #f1e8df; --vn-muted: #ab9a8b; --vn-line: #3a3029;
+    --vn-tint: #2f2721; --vn-chip: #3a2f27; --vn-accent: #c9a27e; --vn-accent-deep: #ddb892; --vn-on-accent: #1c1713;
+  }
+}
+html.vn-active,
+html.vn-active body,
+html.vn-active #root > div { background: var(--vn-bg); }
+
+.vn {
+  --bg: var(--vn-bg); --surface: var(--vn-surface); --ink: var(--vn-ink); --muted: var(--vn-muted); --line: var(--vn-line);
+  --tint: var(--vn-tint); --chip: var(--vn-chip); --accent: var(--vn-accent); --accent-deep: var(--vn-accent-deep); --on-accent: var(--vn-on-accent);
+  max-width: 560px; margin: 0 auto; padding-bottom: 40px; color: var(--ink);
+  font-family: Pretendard, "Noto Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-size: 15px; line-height: 1.6; letter-spacing: -0.01em; -webkit-font-smoothing: antialiased;
+}
+/* 공통 상단 내비(MeNav)의 회색 글씨를 이 톤에 맞춘다 (다크모드에서 안 보이는 문제 방지) */
+.vn .text-gray-500 { color: var(--muted); }
+.vn .text-gray-800 { color: var(--ink); }
+
+.vn .intro { padding: 4px 4px 20px; }
+.vn h1 { font-size: 1.45rem; font-weight: 700; margin: 0; line-height: 1.35; }
+.vn .intro p { margin: 8px 0 0; color: var(--muted); font-size: 0.93rem; }
+.vn .intro p.range { display: inline-block; margin: 10px 0 0; background: var(--chip); color: var(--accent-deep); font-weight: 700; font-size: 0.82rem; padding: 3px 11px; border-radius: 999px; }
+.vn .year { font-size: 0.82rem; font-weight: 700; color: var(--accent-deep); margin: 14px 0 8px; }
+.vn .notice { margin: 0 0 14px; padding: 12px 14px; border-radius: 14px; background: var(--tint); color: var(--muted); font-size: 0.88rem; }
+
+.vn .card { background: var(--surface); border-radius: 18px; padding: 20px; margin-bottom: 14px; border: 1px solid var(--line); }
+.vn .card h2 { font-size: 1rem; font-weight: 700; margin: 0; }
+.vn .card .hint { color: var(--muted); font-size: 0.86rem; margin: 4px 0 16px; }
+.vn .card .hint + div .year { margin-top: 0; }
+
+/* month picker */
+.vn .mgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.vn .month { appearance: none; font: inherit; cursor: pointer; background: var(--tint); color: var(--ink); border: 1.5px solid transparent; border-radius: 14px; padding: 12px 4px 10px; text-align: center; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.vn .month b { display: block; font-size: 1rem; font-weight: 700; }
+.vn .month span { display: block; font-size: 0.74rem; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vn .month:hover { border-color: var(--accent); }
+.vn .month[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.vn .month[aria-pressed="true"] span { color: var(--on-accent); opacity: 0.85; }
+.vn .month:focus-visible, .vn .none:focus-visible, .vn .mcell:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 2px; }
+
+.vn .none { appearance: none; font: inherit; cursor: pointer; width: 100%; margin-top: 10px; background: transparent; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 14px; padding: 11px; font-size: 0.9rem; }
+.vn .none[aria-pressed="true"] { border-style: solid; border-color: var(--accent); color: var(--accent-deep); background: var(--tint); font-weight: 500; }
+
+.vn .field { margin-top: 18px; }
+.vn .field label { display: block; font-size: 0.88rem; font-weight: 500; margin-bottom: 6px; }
+.vn .field label span { color: var(--muted); font-weight: 400; }
+.vn .memo { width: 100%; font: inherit; color: var(--ink); background: var(--tint); border: 1.5px solid transparent; border-radius: 12px; padding: 11px 13px; }
+.vn .memo::placeholder { color: var(--muted); opacity: 0.8; }
+.vn .memo:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.vn .status { margin-top: 12px; font-size: 0.84rem; color: var(--muted); min-height: 1.3em; }
+
+/* overview heatmap */
+.vn .months { display: grid; margin-bottom: 4px; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.vn .mcell { appearance: none; font: inherit; color: var(--ink); cursor: pointer; position: relative; overflow: hidden; border-radius: 10px; background: var(--tint); border: 1.5px solid transparent; padding: 8px 0 7px; text-align: center; }
+.vn .mcell:hover { border-color: var(--accent); }
+.vn .mcell[aria-pressed="true"] { border-color: var(--accent-deep); }
+.vn .mcell .fill { position: absolute; inset: auto 0 0 0; height: var(--h, 0%); background: var(--accent); opacity: 0.28; }
+.vn .mcell small, .vn .mcell b { position: relative; display: block; }
+.vn .mcell small { font-size: 0.72rem; color: var(--muted); }
+.vn .mcell b { font-size: 0.95rem; font-weight: 700; }
+
+.vn .people { list-style: none; margin: 0; padding: 0; }
+.vn .person { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.vn .person:first-child { border-top: 0; padding-top: 4px; }
+.vn .avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; background: var(--chip); color: var(--accent-deep); font-weight: 700; font-size: 0.9rem; }
+.vn .person .body { min-width: 0; flex: 1; }
+.vn .person .name { font-weight: 700; font-size: 0.95rem; }
+.vn .person .name em { font-style: normal; font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-left: 4px; }
+.vn .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.vn .chip { background: var(--chip); color: var(--accent-deep); font-weight: 500; font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; }
+.vn .chip.quiet { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.vn .person .note { margin-top: 6px; font-size: 0.86rem; color: var(--muted); overflow-wrap: anywhere; }
+.vn .empty { padding: 14px 0 4px; text-align: center; color: var(--muted); font-size: 0.9rem; margin: 0; }
+.vn .sub-h { font-size: 0.9rem; font-weight: 700; margin: 20px 0 8px; }
+
+/* date sheet */
+.vn dialog.sheet { border: 0; padding: 0; background: var(--surface); color: var(--ink); width: 100%; max-width: 440px; border-radius: 22px; box-shadow: 0 20px 60px rgba(40, 25, 10, 0.25); max-height: calc(100% - 24px); overflow: auto; margin: auto; }
+.vn dialog.sheet::backdrop { background: rgba(35, 24, 15, 0.45); }
+@media (max-width: 520px) {
+  .vn dialog.sheet { margin: auto 0 0; max-width: none; border-radius: 22px 22px 0 0; max-height: 92%; }
+}
+.vn .sh-in { padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px)); }
+.vn .sh-head { display: flex; align-items: center; justify-content: space-between; }
+.vn .sh-head h3 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.vn .x { appearance: none; border: 0; background: var(--tint); color: var(--muted); width: 32px; height: 32px; border-radius: 50%; font-size: 1.1rem; cursor: pointer; line-height: 1; }
+.vn .sh-hint { color: var(--muted); font-size: 0.84rem; margin: 4px 0 14px; }
+.vn .dow, .vn .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.vn .dow span { text-align: center; font-size: 0.74rem; color: var(--muted); padding-bottom: 4px; }
+.vn .dow span:first-child { color: #c0624a; }
+.vn .day { appearance: none; font: inherit; border: 1.5px solid transparent; background: transparent; color: var(--ink); border-radius: 10px; aspect-ratio: 1/1; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
+.vn .day b { font-size: 0.92rem; font-weight: 500; line-height: 1.1; }
+.vn .day small { font-size: 0.6rem; color: var(--muted); line-height: 1; min-height: 0.6rem; margin-top: 2px; }
+.vn .day:hover { background: var(--tint); }
+.vn .day.sun b { color: #c0624a; }
+.vn .day.on { background: var(--accent); color: var(--on-accent); }
+.vn .day.on b, .vn .day.on small { color: var(--on-accent); }
+.vn .day.anchor { border-color: var(--accent-deep); background: var(--tint); }
+.vn .day:disabled { opacity: 0.3; cursor: default; background: transparent; }
+.vn .day:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 1px; }
+.vn .legend { font-size: 0.74rem; color: var(--muted); margin: 8px 0 0; }
+.vn .picked { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; min-height: 30px; }
+.vn .pick { display: inline-flex; align-items: center; gap: 4px; background: var(--chip); color: var(--accent-deep); font-weight: 500; font-size: 0.84rem; padding: 3px 4px 3px 11px; border-radius: 999px; }
+.vn .pick button { appearance: none; border: 0; background: transparent; color: inherit; cursor: pointer; width: 22px; height: 22px; border-radius: 50%; font-size: 0.9rem; }
+.vn .picked .empty-p { font-size: 0.84rem; color: var(--muted); }
+.vn .sh-actions { display: flex; gap: 8px; margin-top: 18px; }
+.vn .btn { appearance: none; font: inherit; font-weight: 700; border-radius: 14px; padding: 13px; cursor: pointer; border: 0; }
+.vn .btn.primary { flex: 1; background: var(--accent); color: var(--on-accent); }
+.vn .btn.ghost { background: var(--tint); color: var(--muted); font-weight: 500; padding: 13px 16px; }
+@media (prefers-reduced-motion: reduce) {
+  .vn * { transition: none !important; }
+}

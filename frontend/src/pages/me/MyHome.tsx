@@ -10,6 +10,7 @@ const MENU = [
   { key: "team-schedule", label: "이번 달 전체 스케줄", to: "/me/team-schedule" },
   { key: "dayoff", label: "사전 휴무 신청", to: "/me/dayoff" },
   { key: "leave", label: "내 연차", to: "/me/leave" },
+  { key: "vacation-notes", label: "휴가 일정 공유", to: "/me/vacation-notes" },
   { key: "pin", label: "PIN 변경", to: "/me/change-pin" },
 ];
 
@@ -23,6 +24,9 @@ export default function MyHome() {
   }, []);
 
   const isPartTime = me?.employment_type === "part_time";
+  // 휴가 일정 공유는 정직원·점장만 (파트타임·사장님은 메뉴 자체를 숨김)
+  const canVacationNotes =
+    !!me && (me.role === "staff" || me.role === "manager") && me.employment_type === "full_time";
 
   return (
     <div>
@@ -35,7 +39,7 @@ export default function MyHome() {
       </p>
 
       <ul className="grid gap-3 sm:grid-cols-2">
-        {MENU.map((m) => {
+        {MENU.filter((m) => m.key !== "vacation-notes" || canVacationNotes).map((m) => {
           const disabled = isPartTime && (m.key === "leave" || m.key === "dayoff");
           return (
             <li key={m.key}>

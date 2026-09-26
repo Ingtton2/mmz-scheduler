@@ -15,6 +15,7 @@ import LeaveManagementPage from "./pages/LeaveManagementPage";
 import StaffingPage from "./pages/StaffingPage";
 import SchedulePage from "./pages/SchedulePage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
+import VacationNotesAdminPage from "./pages/VacationNotesAdminPage";
 import LoginPage from "./pages/LoginPage";
 import JoinPage from "./pages/JoinPage";
 import StaffLoginPage from "./pages/StaffLoginPage";
@@ -24,6 +25,7 @@ import MyLeavePage from "./pages/me/MyLeavePage";
 import MyDayOffPage from "./pages/me/MyDayOffPage";
 import MySchedulePage from "./pages/me/MySchedulePage";
 import MyTeamSchedulePage from "./pages/me/MyTeamSchedulePage";
+import MyVacationNotesPage from "./pages/me/MyVacationNotesPage";
 import RequireAuth from "./RequireAuth";
 import RequireStaffAuth from "./RequireStaffAuth";
 import { getAuthStatus, logout as apiLogout } from "./api/auth";
@@ -143,6 +145,14 @@ export default function App() {
               </RequireAuth>
             }
           />
+          <Route
+            path="/admin/vacation-notes"
+            element={
+              <RequireAuth>
+                <VacationNotesAdminPage />
+              </RequireAuth>
+            }
+          />
 
           {/* 직원 셀프서비스 — 스펙 9 */}
           <Route path="/join" element={<JoinPage />} />
@@ -192,6 +202,14 @@ export default function App() {
             element={
               <RequireStaffAuth>
                 <MyTeamSchedulePage />
+              </RequireStaffAuth>
+            }
+          />
+          <Route
+            path="/me/vacation-notes"
+            element={
+              <RequireStaffAuth>
+                <MyVacationNotesPage />
               </RequireStaffAuth>
             }
           />
