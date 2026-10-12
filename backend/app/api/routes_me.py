@@ -251,9 +251,10 @@ def create_my_dayoff(
             exist_by_month[ym] = exist_by_month.get(ym, 0) + cnt
     for ym, cnt in new_by_month.items():
         if exist_by_month.get(ym, 0) + cnt > MAX_PER_MONTH:
+            # 한도 숫자는 직원에게 알리지 않는다 (사장님 방침) — 관리자 화면에서만 보인다.
             raise HTTPException(
                 status_code=422,
-                detail=f"사전 휴무 신청은 한 달 최대 {MAX_PER_MONTH}일까지입니다.",
+                detail="이번 달은 사전 휴무를 더 신청할 수 없어요. 사장님께 말씀해 주세요.",
             )
 
     req = DayOffRequest(

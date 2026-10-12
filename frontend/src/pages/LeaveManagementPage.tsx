@@ -13,6 +13,7 @@ import {
   MAX_PER_MONTH,
   type DayOffRequest,
 } from "../api/dayoff";
+import { getHolidays } from "../api/holiday";
 import { listStaff, type Staff } from "../api/staff";
 import { LABEL } from "../labels";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -25,7 +26,7 @@ import {
   selfServiceWindowOpen,
   todayYm,
 } from "../utils/month";
-import { fmtMdWd, fmtRange } from "../utils/format";
+import { fmtMdWd, fmtRange, weekdayOf } from "../utils/format";
 import LeaveUsageTab from "./LeaveUsageTab";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -67,6 +68,7 @@ export default function LeaveManagementPage() {
   const [tab, setTab] = useState<"approval" | "usage">("approval");
   const [staff, setStaff] = useState<Staff[]>([]);
   const [dayoffRequests, setDayoffRequests] = useState<DayOffRequest[]>([]);
+  const [holidays, setHolidays] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -134,6 +136,36 @@ export default function LeaveManagementPage() {
           }))
           .filter((x) => new Set(x.people.map((p) => p.staff_id)).size >= 2);
 
+  // 선택한 달, 직원별 주말·공휴일 사전휴무 일수 (반려 제외).
+  // 자동배치는 정직원·점장의 주말·공휴일 휴무를 한 달 2~4일(목표 3일)로 맞추는데,
+  // 사전휴무는 자동배치가 못 옮기는 고정값이라 여기서 몰리면 다른 사람이 주말을 더 메워야 한다.
+  const isWeekendOrHoliday = (d: string) => {
+    const w = weekdayOf(d);
+    return w === "토" || w === "일" || holidays.has(d);
+  };
+  const weekendByStaff =
+    monthFilter === null
+      ? []
+      : [
+          ...monthDays(monthFilter)
+            .filter(isWeekendOrHoliday)
+            .reduce((m, d) => {
+              for (const r of activeRows) {
+                if (r.start_date <= d && d <= r.end_date) {
+                  const cur = m.get(r.staff_id) ?? { name: r.staff_name, confirmed: 0, requested: 0 };
+                  if (r.status === "confirmed") cur.confirmed++;
+                  else cur.requested++;
+                  m.set(r.staff_id, cur);
+                }
+              }
+              return m;
+            }, new Map<number, { name: string; confirmed: number; requested: number }>())
+            .values(),
+        ]
+          .map((x) => ({ ...x, total: x.confirmed + x.requested }))
+          .filter((x) => x.total >= 3) // 하루이틀은 문제없으니 3일 이상만 보여준다
+          .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
   const isFocused = (r: Row) =>
     focusDate !== null &&
     r.status !== "rejected" &&
@@ -164,9 +196,14 @@ export default function LeaveManagementPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const [s, dr] = await Promise.all([listStaff(), listDayOffRequests()]);
+      const [s, dr, hs] = await Promise.all([
+        listStaff(),
+        listDayOffRequests(),
+        getHolidays(),
+      ]);
       setStaff(s);
       setDayoffRequests(dr);
+      setHolidays(new Set(hs.map((h) => h.date)));
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -474,6 +511,39 @@ export default function LeaveManagementPage() {
                           </span>
                         ))}
                       </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {monthFilter !== null && !loading && (
+            <div className="mb-3 rounded-lg border bg-white px-3 py-2 text-sm">
+              <div className="mb-1 font-medium">
+                주말·공휴일 신청 많은 직원{" "}
+                <span className="font-normal text-gray-400">
+                  (3일 이상만 · 반려 제외 · 5일 이상은 빨간색)
+                </span>
+              </div>
+              {weekendByStaff.length === 0 ? (
+                <p className="text-gray-400">주말·공휴일을 3일 이상 신청한 직원이 없습니다.</p>
+              ) : (
+                <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                  {weekendByStaff.map((x) => (
+                    <li key={x.name} className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <span>{x.name}</span>
+                      <span
+                        className={
+                          "rounded-full px-2 py-0.5 text-xs font-semibold " +
+                          (x.total >= 5 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800")
+                        }
+                      >
+                        {x.total}일
+                      </span>
+                      {x.requested > 0 && (
+                        <span className="text-xs text-gray-400">대기 {x.requested}</span>
+                      )}
                     </li>
                   ))}
                 </ul>
