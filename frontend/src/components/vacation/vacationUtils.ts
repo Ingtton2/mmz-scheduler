@@ -1,5 +1,6 @@
 // 휴가 일정 공유 — 날짜/구간 계산 도우미 (프로토타입 로직 그대로).
 import type { DateRange } from "../../api/vacationNotes";
+import { weekdayOf } from "../../utils/format";
 
 export const pad = (n: number) => String(n).padStart(2, "0");
 export const yOf = (k: string) => +k.slice(0, 4);
@@ -28,8 +29,14 @@ export function mergeRanges(list: DateRange[]): DateRange[] {
 export const rangesIn = (ranges: DateRange[], k: string) =>
   ranges.filter((r) => r.start.slice(0, 7) === k);
 
-export const rText = (r: DateRange) =>
+const dText = (d: string) => `${dOf(d)}일(${weekdayOf(d)})`;
+
+/** 좁은 달 칸용 — 요일 없이 날짜만. */
+export const rTextShort = (r: DateRange) =>
   r.start === r.end ? `${dOf(r.start)}일` : `${dOf(r.start)}–${dOf(r.end)}일`;
+
+export const rText = (r: DateRange) =>
+  r.start === r.end ? dText(r.start) : `${dText(r.start)}–${dText(r.end)}`;
 
 export const periodLabel = (months: string[]) =>
   months.length

@@ -21,8 +21,6 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   rejected: { label: "반려", cls: "bg-warn text-warn-ink" },
 };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
 export default function MyDayOffPage() {
   const [me, setMe] = useState<MeInfo | null>(null);
   const [requests, setRequests] = useState<MyRequest[]>([]);
@@ -34,9 +32,11 @@ export default function MyDayOffPage() {
   const windowOpen = selfServiceWindowOpen();
   const targetYm = selfServiceTargetYm();
 
+  // 시작일/종료일은 지금 신청 가능한 스케줄 월의 1일로 미리 채워 둔다.
+  const targetFirstDay = `${targetYm}-01`;
   const [form, setForm] = useState({
-    start_date: todayStr(),
-    end_date: todayStr(),
+    start_date: targetFirstDay,
+    end_date: targetFirstDay,
     note: "",
   });
 
@@ -163,6 +163,7 @@ export default function MyDayOffPage() {
         <p className="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
 
+      <h2 className="mb-2 text-sm font-semibold text-gray-700">휴무 신청내역</h2>
       <div className="overflow-x-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
           <thead className="border-b bg-gray-50 text-left text-gray-500">

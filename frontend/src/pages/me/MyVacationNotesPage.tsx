@@ -21,6 +21,7 @@ import {
   periodLabel,
   rangesIn,
   rText,
+  rTextShort,
   yOf,
 } from "../../components/vacation/vacationUtils";
 import "../../components/vacation/vacation.css";
@@ -244,7 +245,7 @@ export default function MyVacationNotesPage() {
                     const rs = rangesIn(mine.ranges, k);
                     const sub = sel
                       ? rs.length
-                        ? rText(rs[0]) + (rs.length > 1 ? ` 외 ${rs.length - 1}` : "")
+                        ? rTextShort(rs[0]) + (rs.length > 1 ? ` 외 ${rs.length - 1}` : "")
                         : "날짜 미정"
                       : `${counts[k]}명`;
                     return (

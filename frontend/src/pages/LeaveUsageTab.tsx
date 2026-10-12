@@ -5,6 +5,7 @@
 import { Fragment, useEffect, useState } from "react";
 import Pagination, { paginate } from "../components/Pagination";
 import { listStaff, type Staff } from "../api/staff";
+import { fmtDateWd, weekdayOf } from "../utils/format";
 import {
   createGrant,
   listGrantCandidates,
@@ -331,13 +332,13 @@ export default function LeaveUsageTab() {
                         <>
                           <span className="text-xs text-gray-400">{u.year_month} 자동배치</span>
                           <div className="whitespace-nowrap">
-                            {u.dates.map((d) => d.slice(5)).join(", ") || "-"}
+                            {u.dates.map((d) => `${d.slice(5)}(${weekdayOf(d)})`).join(", ") || "-"}
                           </div>
                         </>
                       ) : u.start_date === u.end_date ? (
-                        u.start_date
+                        fmtDateWd(u.start_date)
                       ) : (
-                        `${u.start_date} ~ ${u.end_date}`
+                        `${fmtDateWd(u.start_date)} ~ ${fmtDateWd(u.end_date)}`
                       )}
                     </td>
                     <td className="px-3 py-2 text-right">{fmtDays(u.days)}일</td>

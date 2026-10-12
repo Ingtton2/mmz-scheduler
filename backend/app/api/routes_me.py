@@ -206,7 +206,7 @@ def my_dayoff_requests(
     rows = session.exec(
         select(DayOffRequest)
         .where(DayOffRequest.staff_id == staff.id)
-        .order_by(DayOffRequest.start_date)
+        .order_by(DayOffRequest.start_date.desc(), DayOffRequest.id.desc())
     ).all()
     return [
         MyDayOffRequestOut(
