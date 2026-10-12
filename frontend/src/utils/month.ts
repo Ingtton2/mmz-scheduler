@@ -24,6 +24,13 @@ export function rangeOverlapsMonth(start: string, end: string, ym: string): bool
   return start <= monthEnd && end >= monthStart;
 }
 
+// 그 달(ym = "YYYY-MM")의 모든 날짜 "YYYY-MM-DD" 목록.
+export function monthDays(ym: string): string[] {
+  const [y, m] = ym.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return Array.from({ length: lastDay }, (_, i) => `${ym}-${String(i + 1).padStart(2, "0")}`);
+}
+
 // --- 직원 셀프서비스 신청 가능 기간 (스펙 9-5) ------------------------------
 // 백엔드 app/services/request_window.py 와 같은 규칙: 이번 달 20일 17시(한국시간)까지,
 // "다음 달" 스케줄에 대해서만 신청 가능. 여기 값은 화면 안내용이고,

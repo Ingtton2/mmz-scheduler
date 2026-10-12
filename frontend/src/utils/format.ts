@@ -9,6 +9,9 @@ export function weekdayOf(ymd: string): string {
 
 export const fmtDateWd = (ymd: string): string => `${ymd}(${weekdayOf(ymd)})`;
 
+// 연도 없이 짧게: "11-03(화)"
+export const fmtMdWd = (ymd: string): string => `${ymd.slice(5)}(${weekdayOf(ymd)})`;
+
 export function fmtRange(start: string, end: string, days: number): string {
   return start === end
     ? fmtDateWd(start)

@@ -17,9 +17,15 @@ import { listStaff, type Staff } from "../api/staff";
 import { LABEL } from "../labels";
 import ConfirmDialog from "../components/ConfirmDialog";
 import MonthFilterBar from "../components/MonthFilterBar";
-import Pagination, { paginate } from "../components/Pagination";
-import { rangeOverlapsMonth, todayYm } from "../utils/month";
-import { fmtRange } from "../utils/format";
+import Pagination, { PAGE_SIZE, paginate } from "../components/Pagination";
+import {
+  monthDays,
+  rangeOverlapsMonth,
+  selfServiceTargetYm,
+  selfServiceWindowOpen,
+  todayYm,
+} from "../utils/month";
+import { fmtMdWd, fmtRange } from "../utils/format";
 import LeaveUsageTab from "./LeaveUsageTab";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -67,9 +73,14 @@ export default function LeaveManagementPage() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   // 반려로 넘길 때 사유를 받는 중인 신청 (사유는 필수)
   const [rejecting, setRejecting] = useState<{ id: number; reason: string } | null>(null);
-  const [monthFilter, setMonthFilter] = useState<string | null>(todayYm());
+  // 직원 신청 기간(1일~20일 17시)에는 지금 신청받는 다음 달부터, 그 뒤엔 이번 달부터 보여준다.
+  const [monthFilter, setMonthFilter] = useState<string | null>(() =>
+    selfServiceWindowOpen() ? selfServiceTargetYm() : todayYm(),
+  );
   const [staffFilter, setStaffFilter] = useState("");
   const [page, setPage] = useState(1);
+  // "2명 이상 겹치는 날"에서 누른 날짜 — 그날 쉬는 신청 줄을 표에서 강조한다.
+  const [focusDate, setFocusDate] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     staff_id: "",
@@ -107,6 +118,40 @@ export default function LeaveManagementPage() {
       ? staffRows
       : staffRows.filter((r) => rangeOverlapsMonth(r.start_date, r.end_date, monthFilter));
   const pagedRows = paginate(visibleRows, page);
+
+  // --- 직원끼리 겹치는 사전휴무 (반려된 건 제외) ---
+  // 직원별 보기 필터와 상관없이 전체 직원 기준으로 겹침을 본다.
+  const activeRows = rows.filter((r) => r.status !== "rejected");
+
+  // 선택한 달에서 2명 이상 쉬는 날.
+  const crowdedDays =
+    monthFilter === null
+      ? []
+      : monthDays(monthFilter)
+          .map((d) => ({
+            date: d,
+            people: activeRows.filter((r) => r.start_date <= d && d <= r.end_date),
+          }))
+          .filter((x) => new Set(x.people.map((p) => p.staff_id)).size >= 2);
+
+  const isFocused = (r: Row) =>
+    focusDate !== null &&
+    r.status !== "rejected" &&
+    r.start_date <= focusDate &&
+    focusDate <= r.end_date;
+
+  // 날짜를 누르면 강조하고, 강조된 첫 줄이 있는 페이지로 이동. 같은 날짜를 다시 누르면 해제.
+  function toggleFocus(d: string) {
+    if (focusDate === d) {
+      setFocusDate(null);
+      return;
+    }
+    setFocusDate(d);
+    const idx = visibleRows.findIndex(
+      (r) => r.status !== "rejected" && r.start_date <= d && d <= r.end_date,
+    );
+    if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE) + 1);
+  }
 
   function setStart(v: string) {
     setForm((f) => ({
@@ -379,11 +424,63 @@ export default function LeaveManagementPage() {
             month={monthFilter}
             onChange={(ym) => {
               setMonthFilter(ym);
+              setFocusDate(null);
               setPage(1);
             }}
             total={staffRows.length}
             shown={visibleRows.length}
           />
+          {monthFilter !== null && !loading && (
+            <div className="mb-3 rounded-lg border bg-white px-3 py-2 text-sm">
+              <div className="mb-1 font-medium">
+                2명 이상 겹치는 날{" "}
+                <span className="font-normal text-gray-400">
+                  ({crowdedDays.length ? `${crowdedDays.length}일` : "없음"} · 반려 제외)
+                </span>
+              </div>
+              {crowdedDays.length > 0 && (
+                <ul className="flex flex-col gap-1">
+                  {crowdedDays.map(({ date, people }) => (
+                    <li key={date} className="flex flex-wrap items-baseline gap-x-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleFocus(date)}
+                        aria-pressed={focusDate === date}
+                        className={
+                          "w-24 shrink-0 rounded px-1.5 py-0.5 text-left font-medium whitespace-nowrap " +
+                          (focusDate === date
+                            ? "bg-primary text-white"
+                            : "text-primary underline-offset-2 hover:underline")
+                        }
+                      >
+                        {fmtMdWd(date)}
+                      </button>
+                      <span
+                        className={
+                          "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap " +
+                          (people.length >= 3 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800")
+                        }
+                      >
+                        {people.length}명
+                      </span>
+                      <span className="text-gray-700">
+                        {people.map((p, i) => (
+                          <span key={p.id}>
+                            {i > 0 && ", "}
+                            {p.staff_name}
+                            {p.status === "requested" && (
+                              <span className="text-xs text-gray-400">(대기)</span>
+                            )}
+                          </span>
+                        ))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-lg border bg-white">
             <table className="w-full text-sm">
               <thead className="border-b bg-gray-50 text-left text-gray-500">
@@ -414,75 +511,80 @@ export default function LeaveManagementPage() {
                     </td>
                   </tr>
                 ) : (
-                  pagedRows.map((r) => (
-                    <tr key={rowKey(r)} className="border-b last:border-0">
-                      <td className="px-3 py-2 font-medium whitespace-nowrap">
-                        {fmtRange(r.start_date, r.end_date, r.days)}
-                      </td>
-                      <td className="px-3 py-2">{r.staff_name}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-gray-500">
-                        {r.applied_at}
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
-                          onClick={() => toggleStatus(r)}
-                          className={
-                            "rounded-full px-2 py-0.5 text-xs font-semibold " +
-                            (r.status === "confirmed"
-                              ? "bg-mint text-mint-ink"
-                              : r.status === "rejected"
-                                ? "bg-warn text-warn-ink"
-                                : "bg-amber-100 text-amber-800")
-                          }
-                          title="눌러서 상태 전환"
-                        >
-                          {LABEL.leaveStatus[r.status] ?? r.status}
-                        </button>
-                        {r.status === "rejected" && r.reject_reason && (
-                          <div className="mt-1 max-w-[14rem] text-xs text-gray-500">
-                            사유: {r.reject_reason}
-                          </div>
-                        )}
-                        {rejecting?.id === r.id && (
-                          <div className="mt-2 flex flex-wrap items-center gap-1">
-                            <input
-                              autoFocus
-                              value={rejecting.reason}
-                              onChange={(e) => setRejecting({ id: r.id, reason: e.target.value })}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") confirmReject();
-                                if (e.key === "Escape") setRejecting(null);
-                              }}
-                              placeholder="반려 사유 (필수)"
-                              className="w-44 rounded border border-gray-300 px-2 py-1 text-xs"
-                            />
-                            <button
-                              onClick={confirmReject}
-                              disabled={!rejecting.reason.trim()}
-                              className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-40"
-                            >
-                              반려 확정
-                            </button>
-                            <button
-                              onClick={() => setRejecting(null)}
-                              className="text-xs text-gray-500 hover:underline"
-                            >
-                              취소
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
-                      <td className="px-3 py-2 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => setPendingDelete(rowKey(r))}
-                          className="text-xs text-red-600 hover:underline"
-                        >
-                          삭제
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  pagedRows.map((r) => {
+                    return (
+                      <tr
+                        key={rowKey(r)}
+                        className={"border-b last:border-0 " + (isFocused(r) ? "bg-amber-100" : "")}
+                      >
+                        <td className="px-3 py-2 font-medium whitespace-nowrap">
+                          {fmtRange(r.start_date, r.end_date, r.days)}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap">{r.staff_name}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-500">
+                          {r.applied_at}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            onClick={() => toggleStatus(r)}
+                            className={
+                              "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap " +
+                              (r.status === "confirmed"
+                                ? "bg-mint text-mint-ink"
+                                : r.status === "rejected"
+                                  ? "bg-warn text-warn-ink"
+                                  : "bg-amber-100 text-amber-800")
+                            }
+                            title="눌러서 상태 전환"
+                          >
+                            {LABEL.leaveStatus[r.status] ?? r.status}
+                          </button>
+                          {r.status === "rejected" && r.reject_reason && (
+                            <div className="mt-1 max-w-[14rem] text-xs text-gray-500">
+                              사유: {r.reject_reason}
+                            </div>
+                          )}
+                          {rejecting?.id === r.id && (
+                            <div className="mt-2 flex flex-wrap items-center gap-1">
+                              <input
+                                autoFocus
+                                value={rejecting.reason}
+                                onChange={(e) => setRejecting({ id: r.id, reason: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") confirmReject();
+                                  if (e.key === "Escape") setRejecting(null);
+                                }}
+                                placeholder="반려 사유 (필수)"
+                                className="w-44 rounded border border-gray-300 px-2 py-1 text-xs"
+                              />
+                              <button
+                                onClick={confirmReject}
+                                disabled={!rejecting.reason.trim()}
+                                className="rounded bg-red-600 px-2 py-1 text-xs text-white disabled:opacity-40"
+                              >
+                                반려 확정
+                              </button>
+                              <button
+                                onClick={() => setRejecting(null)}
+                                className="text-xs text-gray-500 hover:underline"
+                              >
+                                취소
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600">{r.note ?? ""}</td>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => setPendingDelete(rowKey(r))}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                      );
+                  })
                 )}
               </tbody>
             </table>
