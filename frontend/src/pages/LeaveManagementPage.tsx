@@ -83,6 +83,8 @@ export default function LeaveManagementPage() {
   const [page, setPage] = useState(1);
   // "2명 이상 겹치는 날"에서 누른 날짜 — 그날 쉬는 신청 줄을 표에서 강조한다.
   const [focusDate, setFocusDate] = useState<string | null>(null);
+  // "주말·공휴일 신청 많은 직원"에서 누른 직원 — 그 직원의 주말·공휴일 포함 신청 줄을 강조한다.
+  const [focusStaff, setFocusStaff] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     staff_id: "",
@@ -152,37 +154,66 @@ export default function LeaveManagementPage() {
             .reduce((m, d) => {
               for (const r of activeRows) {
                 if (r.start_date <= d && d <= r.end_date) {
-                  const cur = m.get(r.staff_id) ?? { name: r.staff_name, confirmed: 0, requested: 0 };
+                  const cur = m.get(r.staff_id) ?? {
+                    staff_id: r.staff_id,
+                    name: r.staff_name,
+                    confirmed: 0,
+                    requested: 0,
+                  };
                   if (r.status === "confirmed") cur.confirmed++;
                   else cur.requested++;
                   m.set(r.staff_id, cur);
                 }
               }
               return m;
-            }, new Map<number, { name: string; confirmed: number; requested: number }>())
+            }, new Map<number, { staff_id: number; name: string; confirmed: number; requested: number }>())
             .values(),
         ]
           .map((x) => ({ ...x, total: x.confirmed + x.requested }))
           .filter((x) => x.total >= 3) // 하루이틀은 문제없으니 3일 이상만 보여준다
           .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
-  const isFocused = (r: Row) =>
-    focusDate !== null &&
-    r.status !== "rejected" &&
-    r.start_date <= focusDate &&
-    focusDate <= r.end_date;
+  // 신청 기간 중 선택한 달에 속한 주말·공휴일이 하루라도 있는지.
+  const hasWeekendInMonth = (r: Row) =>
+    monthFilter !== null &&
+    monthDays(monthFilter).some(
+      (d) => r.start_date <= d && d <= r.end_date && isWeekendOrHoliday(d),
+    );
 
-  // 날짜를 누르면 강조하고, 강조된 첫 줄이 있는 페이지로 이동. 같은 날짜를 다시 누르면 해제.
+  const matchesDate = (r: Row, d: string) =>
+    r.status !== "rejected" && r.start_date <= d && d <= r.end_date;
+  const matchesStaff = (r: Row, id: number) =>
+    r.status !== "rejected" && r.staff_id === id && hasWeekendInMonth(r);
+
+  const isFocused = (r: Row) =>
+    (focusDate !== null && matchesDate(r, focusDate)) ||
+    (focusStaff !== null && matchesStaff(r, focusStaff));
+
+  // 강조된 첫 줄이 있는 페이지로 이동.
+  function jumpTo(match: (r: Row) => boolean) {
+    const idx = visibleRows.findIndex(match);
+    if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE) + 1);
+  }
+
+  // 날짜/직원을 누르면 강조 (둘 중 하나만). 같은 걸 다시 누르면 해제.
   function toggleFocus(d: string) {
+    setFocusStaff(null);
     if (focusDate === d) {
       setFocusDate(null);
       return;
     }
     setFocusDate(d);
-    const idx = visibleRows.findIndex(
-      (r) => r.status !== "rejected" && r.start_date <= d && d <= r.end_date,
-    );
-    if (idx >= 0) setPage(Math.floor(idx / PAGE_SIZE) + 1);
+    jumpTo((r) => matchesDate(r, d));
+  }
+
+  function toggleFocusStaff(id: number) {
+    setFocusDate(null);
+    if (focusStaff === id) {
+      setFocusStaff(null);
+      return;
+    }
+    setFocusStaff(id);
+    jumpTo((r) => matchesStaff(r, id));
   }
 
   function setStart(v: string) {
@@ -462,6 +493,7 @@ export default function LeaveManagementPage() {
             onChange={(ym) => {
               setMonthFilter(ym);
               setFocusDate(null);
+              setFocusStaff(null);
               setPage(1);
             }}
             total={staffRows.length}
@@ -531,8 +563,20 @@ export default function LeaveManagementPage() {
               ) : (
                 <ul className="flex flex-wrap gap-x-4 gap-y-1">
                   {weekendByStaff.map((x) => (
-                    <li key={x.name} className="flex items-baseline gap-1.5 whitespace-nowrap">
-                      <span>{x.name}</span>
+                    <li key={x.staff_id} className="flex items-baseline gap-1.5 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => toggleFocusStaff(x.staff_id)}
+                        aria-pressed={focusStaff === x.staff_id}
+                        className={
+                          "rounded px-1.5 py-0.5 font-medium " +
+                          (focusStaff === x.staff_id
+                            ? "bg-primary text-white"
+                            : "text-primary underline-offset-2 hover:underline")
+                        }
+                      >
+                        {x.name}
+                      </button>
                       <span
                         className={
                           "rounded-full px-2 py-0.5 text-xs font-semibold " +
