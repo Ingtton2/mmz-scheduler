@@ -502,12 +502,11 @@ export default function LeaveManagementPage() {
           {monthFilter !== null && !loading && (
             <div className="mb-3 rounded-lg border bg-white px-3 py-2 text-sm">
               <div className="mb-1 font-medium">
-                2명 이상 겹치는 날{" "}
-                <span className="font-normal text-gray-400">
-                  ({crowdedDays.length ? `${crowdedDays.length}일` : "없음"} · 반려 제외)
-                </span>
+                2명 이상 겹치는 날
               </div>
-              {crowdedDays.length > 0 && (
+              {crowdedDays.length === 0 ? (
+                <p className="text-gray-400">겹치는 날이 없습니다.</p>
+              ) : (
                 <ul className="flex flex-col gap-1">
                   {crowdedDays.map(({ date, people }) => (
                     <li key={date} className="flex flex-wrap items-baseline gap-x-2">
@@ -555,7 +554,7 @@ export default function LeaveManagementPage() {
               <div className="mb-1 font-medium">
                 주말·공휴일 신청 많은 직원{" "}
                 <span className="font-normal text-gray-400">
-                  (3일 이상만 · 반려 제외 · 5일 이상은 빨간색)
+                  (3일 이상)
                 </span>
               </div>
               {weekendByStaff.length === 0 ? (
