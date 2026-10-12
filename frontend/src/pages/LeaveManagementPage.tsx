@@ -464,30 +464,6 @@ export default function LeaveManagementPage() {
           )}
 
           {/* --- 신청 목록 --- */}
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-white px-3 py-2">
-            <label htmlFor="staff-filter" className="text-sm font-medium">
-              직원별 보기
-            </label>
-            <select
-              id="staff-filter"
-              className={field}
-              value={staffFilter}
-              onChange={(e) => {
-                setStaffFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">전체 직원</option>
-              {staff.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-gray-400">
-              “전체 보기”를 함께 누르면 그 직원의 전체 이력을 볼 수 있어요.
-            </span>
-          </div>
           <MonthFilterBar
             month={monthFilter}
             onChange={(ym) => {
@@ -594,6 +570,30 @@ export default function LeaveManagementPage() {
             </div>
           )}
 
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-white px-3 py-2">
+            <label htmlFor="staff-filter" className="text-sm font-medium">
+              직원별 보기
+            </label>
+            <select
+              id="staff-filter"
+              className={field}
+              value={staffFilter}
+              onChange={(e) => {
+                setStaffFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">전체 직원</option>
+              {staff.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400">
+              “전체 보기”를 함께 누르면 그 직원의 전체 이력을 볼 수 있어요.
+            </span>
+          </div>
           <div className="overflow-x-auto rounded-lg border bg-white">
             <table className="w-full text-sm">
               <thead className="border-b bg-gray-50 text-left text-gray-500">
