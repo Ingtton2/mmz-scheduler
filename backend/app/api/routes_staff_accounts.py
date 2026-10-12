@@ -25,6 +25,7 @@ from app.schemas.staff_account import (
     ResetPinResult,
 )
 from app.services import pin as pin_service
+from app.services import staff_tokens
 
 router = APIRouter(prefix="/staff-accounts", tags=["staff-accounts"])
 
@@ -149,4 +150,7 @@ def reset_pin(staff_id: int, session: Session = Depends(get_session)) -> ResetPi
     acc.must_change_pin = True
     session.add(acc)
     session.commit()
+    # 로그인이 DB 에 오래 유지되므로, PIN 을 초기화하면 그 직원의 기존 기기 로그인도 모두 끊는다
+    # (폰 분실 등으로 초기화하는 경우 대비). 직원은 임시 PIN 으로 다시 로그인하면 된다.
+    staff_tokens.revoke_staff(staff_id)
     return ResetPinResult(temp_pin=temp)

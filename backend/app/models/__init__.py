@@ -19,6 +19,7 @@
   ScheduleEntry       스케줄 한 칸
   KitchenRotationAssignment  주방 오픈/미들/마감 3인 로테이션의 그 달 담당
   PersonalScheduleNote  휴가 일정 공유 메모판 (직원 1명당 1줄, 순수 참고용)
+  LoginSession        로그인 유지 정보 (관리자/직원, 서버 재시작해도 유지)
 """
 
 from app.models.enums import (
@@ -39,6 +40,7 @@ from app.models.leave import (
     LeaveUsageLog,
     MonthlyLeavePlan,
 )
+from app.models.login_session import LoginSession
 from app.models.schedule import Schedule, ScheduleEntry
 from app.models.staff import Staff
 from app.models.staff_account import StaffAccount
@@ -60,6 +62,7 @@ __all__ = [
     "LeaveRequest",
     "LeaveRequestStatus",
     "LeaveUsageLog",
+    "LoginSession",
     "MonthlyLeavePlan",
     "PersonalScheduleNote",
     "Position",
